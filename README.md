@@ -1,36 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NuAnswers v2
 
-## Getting Started
+The AI tutor that guides you to the answer — never just gives it.
 
-First, run the development server:
+Built by Beta Alpha Psi · Nu Sigma Chapter · Fairleigh Dickinson University.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Stack
+
+- **Next.js 16** (App Router, React 19) — the web framework
+- **Tailwind CSS 4** — styling
+- **Vercel AI SDK 6** — streaming chat with OpenAI
+- **OpenAI `gpt-4.1`** — the tutoring model (swappable to Claude later via one provider change)
+- **TypeScript** — type safety
+
+## Local setup (first time)
+
+1. Install dependencies (only needed once, or after you pull new code):
+
+   ```sh
+   npm install
+   ```
+
+2. Create your local secrets file:
+
+   ```sh
+   cp .env.example .env.local
+   ```
+
+3. Open `.env.local` in a text editor and paste your real OpenAI API key after `OPENAI_API_KEY=`. Save the file. This file is ignored by git — it will never leave your computer.
+
+4. Start the dev server:
+
+   ```sh
+   npm run dev
+   ```
+
+5. Open http://localhost:3000 in your browser. You should see the NuAnswers landing page. Click **Start a chat** to test the tutor.
+
+## Project structure
+
+```
+src/
+├── app/
+│   ├── page.tsx              Landing page (/)
+│   ├── layout.tsx            Root HTML shell + fonts
+│   ├── globals.css           Tailwind + BAP color tokens
+│   ├── chat/page.tsx         Chat UI (/chat)
+│   └── api/
+│       ├── chat/route.ts     Streaming chat endpoint
+│       └── analytics/route.ts Event logging endpoint
+├── components/
+│   └── Wordmark.tsx          "NuAnswers" brand mark
+└── lib/
+    ├── tutoring-prompt.ts    System prompt enforcing tutoring rules
+    └── analytics.ts          Event logging helper
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## BAP color palette
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Defined as Tailwind tokens in `src/app/globals.css`:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `crimson-*` — primary action color (#8B0000 at 700)
+- `gold-*` — accent, highlights (#C9A84C at 500)
+- `ink-*` — text & surfaces (pure black #0F0F0F at 900, off-white #F5F5F5 at 50)
 
-## Learn More
+Use `bg-crimson-700`, `text-gold-400`, etc. in JSX.
 
-To learn more about Next.js, take a look at the following resources:
+## Deploy to Vercel
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+See the step-by-step deploy guide in the conversation with Claude — you'll push this repo to GitHub first, then connect it in Vercel.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Roadmap
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [x] Landing page + branded chat with streaming tutor
+- [ ] FDU email login + student accounts
+- [ ] Course info form
+- [ ] File upload (PDF, DOCX, PPTX, CSV, XLSX, images)
+- [ ] RAG — tutor cites from uploaded course materials
+- [ ] Tutoring hours blocker (Mon–Fri 9–11am ET)
+- [ ] Session feedback collection
+- [ ] Admin analytics dashboard
+- [ ] Custom domain nuanswers.org

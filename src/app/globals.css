@@ -1,26 +1,69 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-crimson-50: #fdf2f2;
+  --color-crimson-100: #fbe0e0;
+  --color-crimson-200: #f6bfbf;
+  --color-crimson-300: #ee8f8f;
+  --color-crimson-400: #e26161;
+  --color-crimson-500: #c63737;
+  --color-crimson-600: #a52a2a;
+  --color-crimson-700: #8b0000;
+  --color-crimson-800: #6b0000;
+  --color-crimson-900: #4a0000;
+
+  --color-gold-50: #fbf7ed;
+  --color-gold-100: #f5ebcf;
+  --color-gold-200: #ecd89f;
+  --color-gold-300: #e0c16f;
+  --color-gold-400: #d4b05a;
+  --color-gold-500: #c9a84c;
+  --color-gold-600: #a88838;
+  --color-gold-700: #7f6628;
+  --color-gold-800: #57441b;
+  --color-gold-900: #322610;
+
+  --color-ink-50: #f5f5f5;
+  --color-ink-100: #e5e5e5;
+  --color-ink-200: #c7c7c7;
+  --color-ink-300: #9a9a9a;
+  --color-ink-400: #666666;
+  --color-ink-500: #404040;
+  --color-ink-600: #2d2d2d;
+  --color-ink-700: #1f1f1f;
+  --color-ink-800: #1a1a1a;
+  --color-ink-900: #0f0f0f;
+
+  --color-background: #0f0f0f;
+  --color-foreground: #f5f5f5;
+  --color-surface: #1a1a1a;
+  --color-surface-elevated: #1f1f1f;
+  --color-border: #2d2d2d;
+
+  --font-sans: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  --font-serif: var(--font-playfair), Georgia, "Times New Roman", serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html, body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+::selection {
+  background: var(--color-gold-500);
+  color: var(--color-ink-900);
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+.bg-grain {
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(201, 168, 76, 0.04) 1px, transparent 0);
+  background-size: 24px 24px;
 }
