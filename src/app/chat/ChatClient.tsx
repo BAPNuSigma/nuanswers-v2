@@ -18,10 +18,17 @@ type ChatClientProps = {
   userId: string;
   email: string;
   fullName: string;
+  profileComplete: boolean;
 };
 
-export function ChatClient({ userId, email, fullName }: ChatClientProps) {
+export function ChatClient({
+  userId,
+  email,
+  fullName,
+  profileComplete,
+}: ChatClientProps) {
   const sessionId = useMemo(() => newSessionId(), []);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   const transport = useMemo(
     () => new DefaultChatTransport({ api: "/api/chat" }),
@@ -98,6 +105,9 @@ export function ChatClient({ userId, email, fullName }: ChatClientProps) {
         className="flex-1 overflow-y-auto"
       >
         <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+          {!profileComplete && !bannerDismissed && (
+            <ProfileBanner onDismiss={() => setBannerDismissed(true)} />
+          )}
           {!hasMessages && <Welcome onPick={handleSend} />}
           {hasMessages && (
             <ul className="flex flex-col gap-6">
@@ -152,6 +162,40 @@ export function ChatClient({ userId, email, fullName }: ChatClientProps) {
           </button>
         </form>
       </footer>
+    </div>
+  );
+}
+
+function ProfileBanner({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <div className="mb-6 flex items-start gap-3 rounded-2xl border border-gold-700/40 bg-gold-900/15 p-4">
+      <div className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-gold-600/20 font-serif text-sm font-bold text-gold-300">
+        ★
+      </div>
+      <div className="flex-1">
+        <p className="text-sm font-medium text-gold-100">
+          Help BAP track chapter analytics
+        </p>
+        <p className="mt-1 text-sm leading-relaxed text-ink-200">
+          Tell us your grade, campus, and major. Takes 30 seconds. Optional but
+          super helpful for our chapter reports.
+        </p>
+        <div className="mt-3 flex items-center gap-3">
+          <Link
+            href="/profile"
+            className="inline-flex h-9 items-center rounded-full bg-gold-600 px-4 text-sm font-semibold text-ink-900 transition hover:bg-gold-500"
+          >
+            Complete profile →
+          </Link>
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="text-xs text-ink-400 underline-offset-2 hover:text-ink-200 hover:underline"
+          >
+            Not now
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

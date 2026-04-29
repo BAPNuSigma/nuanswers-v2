@@ -6,13 +6,15 @@
 
 -- ---- profiles --------------------------------------------------------
 -- Extends auth.users with FDU-specific fields. One row per user.
+-- Required at signup: full_name, student_id.
+-- Optional (collected lazily on /profile): grade, campus, major.
 create table if not exists public.profiles (
   id uuid references auth.users on delete cascade primary key,
   full_name text not null,
   student_id text not null check (student_id ~ '^[0-9]{7}$'),
-  grade text not null check (grade in ('Freshman','Sophomore','Junior','Senior','Graduate')),
-  campus text not null check (campus in ('Florham','Metro','Vancouver')),
-  major text not null,
+  grade text check (grade in ('Freshman','Sophomore','Junior','Senior','Graduate')),
+  campus text check (campus in ('Florham','Metro','Vancouver')),
+  major text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

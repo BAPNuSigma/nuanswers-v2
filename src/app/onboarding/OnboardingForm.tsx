@@ -3,16 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import {
-  CAMPUSES,
-  GRADES,
-  MAJORS,
-  STUDENT_ID_HINT,
-  isValidStudentId,
-  type Campus,
-  type Grade,
-  type Major,
-} from "@/lib/auth";
+import { STUDENT_ID_HINT, isValidStudentId } from "@/lib/auth";
 
 export function OnboardingForm({
   email,
@@ -24,9 +15,6 @@ export function OnboardingForm({
   const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [studentId, setStudentId] = useState("");
-  const [grade, setGrade] = useState<Grade>("Freshman");
-  const [campus, setCampus] = useState<Campus>("Florham");
-  const [major, setMajor] = useState<Major>("Accounting");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -49,9 +37,6 @@ export function OnboardingForm({
       id: userId,
       full_name: fullName.trim(),
       student_id: studentId.trim(),
-      grade,
-      campus,
-      major,
     });
 
     if (insertError) {
@@ -63,7 +48,6 @@ export function OnboardingForm({
     await supabase.from("analytics_events").insert({
       user_id: userId,
       event_type: "signup_completed",
-      metadata: { grade, campus, major },
     });
 
     router.replace("/chat");
@@ -78,6 +62,7 @@ export function OnboardingForm({
       <Field label="Full name">
         <input
           required
+          autoFocus
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
           placeholder="Jane Doe"
@@ -98,50 +83,6 @@ export function OnboardingForm({
         />
       </Field>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <Field label="Grade">
-          <select
-            value={grade}
-            onChange={(e) => setGrade(e.target.value as Grade)}
-            className={inputClass}
-          >
-            {GRADES.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Campus">
-          <select
-            value={campus}
-            onChange={(e) => setCampus(e.target.value as Campus)}
-            className={inputClass}
-          >
-            {CAMPUSES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-
-      <Field label="Major">
-        <select
-          value={major}
-          onChange={(e) => setMajor(e.target.value as Major)}
-          className={inputClass}
-        >
-          {MAJORS.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </select>
-      </Field>
-
       {error && (
         <p className="rounded-lg border border-crimson-700/60 bg-crimson-900/20 px-3 py-2 text-sm text-crimson-200">
           {error}
@@ -155,6 +96,11 @@ export function OnboardingForm({
       >
         {submitting ? "Saving…" : "Continue to NuAnswers"}
       </button>
+
+      <p className="text-center text-xs text-ink-400">
+        Two fields, that&apos;s it. You can add grade, campus, and major later
+        on your profile page — totally optional.
+      </p>
     </form>
   );
 }

@@ -43,9 +43,13 @@ export type Profile = {
   id: string;
   full_name: string;
   student_id: string;
-  grade: Grade;
-  campus: Campus;
-  major: Major;
+  grade: Grade | null;
+  campus: Campus | null;
+  major: Major | null;
   created_at: string;
   updated_at: string;
 };
+
+export function isProfileComplete(profile: Pick<Profile, "grade" | "campus" | "major">): boolean {
+  return Boolean(profile.grade && profile.campus && profile.major);
+}

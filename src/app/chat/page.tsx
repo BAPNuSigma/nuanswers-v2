@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ChatClient } from "./ChatClient";
-import type { Profile } from "@/lib/auth";
+import { isProfileComplete, type Profile } from "@/lib/auth";
 
 export default async function ChatPage() {
   const supabase = await createClient();
@@ -24,6 +24,7 @@ export default async function ChatPage() {
       userId={user.id}
       email={user.email ?? ""}
       fullName={profile.full_name}
+      profileComplete={isProfileComplete(profile)}
     />
   );
 }
