@@ -1,19 +1,23 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { isFduEmail, FDU_EMAIL_HINT } from "@/lib/auth";
 import { Wordmark } from "@/components/Wordmark";
 
-type Status = "idle" | "sending" | "sent" | "error";
+type Step = "email" | "code";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<Status>("idle");
+  const [code, setCode] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: FormEvent) {
+  async function handleSendCode(e: FormEvent) {
     e.preventDefault();
     setError(null);
 
@@ -23,21 +27,58 @@ export default function LoginPage() {
       return;
     }
 
-    setStatus("sending");
+    setSubmitting(true);
     const supabase = createClient();
     const { error: signInError } = await supabase.auth.signInWithOtp({
       email: trimmed,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
+        shouldCreateUser: true,
       },
     });
 
+    setSubmitting(false);
+
     if (signInError) {
       setError(signInError.message);
-      setStatus("error");
-    } else {
-      setStatus("sent");
+      return;
     }
+
+    setEmail(trimmed);
+    setStep("code");
+  }
+
+  async function handleVerifyCode(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    const cleaned = code.replace(/\D/g, "");
+    if (cleaned.length !== 6) {
+      setError("Enter the 6-digit code from your email.");
+      return;
+    }
+
+    setSubmitting(true);
+    const supabase = createClient();
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      email,
+      token: cleaned,
+      type: "email",
+    });
+
+    if (verifyError) {
+      setError(verifyError.message);
+      setSubmitting(false);
+      return;
+    }
+
+    router.replace("/chat");
+  }
+
+  function handleStartOver() {
+    setStep("email");
+    setCode("");
+    setError(null);
   }
 
   return (
@@ -55,14 +96,13 @@ export default function LoginPage() {
           Sign in
         </h1>
         <p className="mt-3 text-sm text-ink-300">
-          Enter your FDU email — we&apos;ll send you a one-tap login link. No
-          password to remember.
+          {step === "email"
+            ? "Enter your FDU email — we'll text you a 6-digit code. No password to remember."
+            : `Enter the 6-digit code we sent to ${email}.`}
         </p>
 
-        {status === "sent" ? (
-          <CheckEmail email={email} onReset={() => setStatus("idle")} />
-        ) : (
-          <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-4">
+        {step === "email" && (
+          <form onSubmit={handleSendCode} className="mt-8 flex flex-col gap-4">
             <label className="flex flex-col gap-2">
               <span className="text-sm font-medium text-ink-200">
                 FDU email
@@ -71,6 +111,7 @@ export default function LoginPage() {
                 type="email"
                 autoComplete="email"
                 required
+                autoFocus
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="firstname.lastname@student.fdu.edu"
@@ -87,10 +128,58 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={status === "sending"}
+              disabled={submitting}
               className="mt-2 inline-flex h-12 items-center justify-center rounded-xl bg-crimson-700 font-semibold text-white transition hover:bg-crimson-600 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {status === "sending" ? "Sending link…" : "Send login link"}
+              {submitting ? "Sending code…" : "Send code"}
+            </button>
+          </form>
+        )}
+
+        {step === "code" && (
+          <form onSubmit={handleVerifyCode} className="mt-8 flex flex-col gap-4">
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-ink-200">
+                6-digit code
+              </span>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="\d{6}"
+                maxLength={6}
+                required
+                autoFocus
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                placeholder="123456"
+                className="rounded-xl border border-border bg-surface px-4 py-3 text-center text-2xl tracking-[0.5em] font-mono text-foreground placeholder:text-ink-500 focus:border-gold-600 focus:outline-none focus:ring-2 focus:ring-gold-600/30"
+              />
+              <span className="text-xs text-ink-400">
+                Check your inbox AND spam folder. Code expires in 1 hour.
+              </span>
+            </label>
+
+            {error && (
+              <p className="rounded-lg border border-crimson-700/60 bg-crimson-900/20 px-3 py-2 text-sm text-crimson-200">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={submitting || code.length !== 6}
+              className="mt-2 inline-flex h-12 items-center justify-center rounded-xl bg-crimson-700 font-semibold text-white transition hover:bg-crimson-600 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {submitting ? "Verifying…" : "Verify and sign in"}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleStartOver}
+              className="text-center text-xs text-ink-400 underline-offset-2 hover:text-gold-300 hover:underline"
+            >
+              ← Use a different email
             </button>
           </form>
         )}
@@ -100,30 +189,6 @@ export default function LoginPage() {
           tutoring for the BAP Nu Sigma chapter.
         </p>
       </main>
-    </div>
-  );
-}
-
-function CheckEmail({
-  email,
-  onReset,
-}: {
-  email: string;
-  onReset: () => void;
-}) {
-  return (
-    <div className="mt-8 rounded-2xl border border-gold-700/40 bg-gold-900/15 p-6 text-center">
-      <div className="font-serif text-xl text-gold-300">Check your email</div>
-      <p className="mt-3 text-sm leading-relaxed text-ink-200">
-        We sent a sign-in link to <strong>{email}</strong>. Open it on this
-        device to finish logging in. The link expires in 1 hour.
-      </p>
-      <button
-        onClick={onReset}
-        className="mt-5 text-xs text-ink-300 underline underline-offset-2 hover:text-gold-300"
-      >
-        Wrong email? Try again
-      </button>
     </div>
   );
 }
