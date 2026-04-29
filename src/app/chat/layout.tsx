@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { ChatClient } from "./ChatClient";
-import type { Profile } from "@/lib/auth";
 
-export default async function ChatPage() {
+export default async function ChatLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -13,17 +15,11 @@ export default async function ChatPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("*")
+    .select("id")
     .eq("id", user.id)
-    .maybeSingle<Profile>();
+    .maybeSingle();
 
   if (!profile) redirect("/onboarding");
 
-  return (
-    <ChatClient
-      userId={user.id}
-      email={user.email ?? ""}
-      fullName={profile.full_name}
-    />
-  );
+  return <>{children}</>;
 }

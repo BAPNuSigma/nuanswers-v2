@@ -1,6 +1,7 @@
 import { openai } from "@ai-sdk/openai";
 import { streamText, convertToModelMessages, type UIMessage } from "ai";
 import { TUTORING_SYSTEM_PROMPT } from "@/lib/tutoring-prompt";
+import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -13,6 +14,18 @@ export async function POST(req: Request) {
           "OPENAI_API_KEY is not set. Add it to .env.local (local) or Vercel environment variables (deployed).",
       }),
       { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return new Response(
+      JSON.stringify({ error: "Not signed in." }),
+      { status: 401, headers: { "Content-Type": "application/json" } }
     );
   }
 
