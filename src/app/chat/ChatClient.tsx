@@ -1,12 +1,13 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Wordmark } from "@/components/Wordmark";
 import { logEvent, newSessionId } from "@/lib/analytics";
 import { MaterialsBar, type DocumentRow } from "./MaterialsBar";
+import { ChatHistory } from "./ChatHistory";
 
 const STARTER_QUESTIONS = [
   "How do I calculate the current ratio?",
@@ -15,13 +16,39 @@ const STARTER_QUESTIONS = [
   "How do I calculate straight-line depreciation?",
 ];
 
+export type StoredMessage = {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  created_at: string;
+};
+
+type UIMsg = {
+  id: string;
+  role: "user" | "assistant" | "system";
+  parts?: Array<{ type: string; text?: string }>;
+};
+
 type ChatClientProps = {
   userId: string;
   email: string;
   fullName: string;
   profileComplete: boolean;
   initialDocuments: DocumentRow[];
+  initialSessionId: string | null;
+  initialMessages: StoredMessage[];
 };
+
+function storedToUIMessages(stored: StoredMessage[]): UIMessage[] {
+  return stored.map(
+    (m) =>
+      ({
+        id: m.id,
+        role: m.role,
+        parts: [{ type: "text", text: m.content }],
+      }) as unknown as UIMessage
+  );
+}
 
 export function ChatClient({
   userId,
@@ -29,32 +56,75 @@ export function ChatClient({
   fullName,
   profileComplete,
   initialDocuments,
+  initialSessionId,
+  initialMessages,
 }: ChatClientProps) {
-  const sessionId = useMemo(() => newSessionId(), []);
+  const clientSessionId = useMemo(() => newSessionId(), []);
   const [bannerDismissed, setBannerDismissed] = useState(false);
-
-  const transport = useMemo(
-    () => new DefaultChatTransport({ api: "/api/chat" }),
-    []
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(
+    initialSessionId
   );
+  const sessionIdRef = useRef<string | null>(initialSessionId);
+  sessionIdRef.current = activeSessionId;
 
-  const { messages, sendMessage, status, error } = useChat({ transport });
+  // Custom transport that:
+  //  (1) injects the current session_id into every chat request body
+  //  (2) reads the x-session-id response header (set by the API when it
+  //      creates a fresh session on first message) and stores it locally
+  //      so subsequent messages stay in the same session.
+  const transport = useMemo(() => {
+    return new DefaultChatTransport({
+      api: "/api/chat",
+      prepareSendMessagesRequest({ messages, body }) {
+        return {
+          body: {
+            ...body,
+            messages,
+            sessionId: sessionIdRef.current,
+          },
+        };
+      },
+      fetch: async (input, init) => {
+        const res = await fetch(input, init);
+        const sid = res.headers.get("x-session-id");
+        if (sid && sid !== sessionIdRef.current) {
+          sessionIdRef.current = sid;
+          setActiveSessionId(sid);
+        }
+        return res;
+      },
+    });
+  }, []);
+
+  const { messages, sendMessage, status, error, setMessages } = useChat({
+    transport,
+  });
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Hydrate the chat with the messages we loaded server-side.
+  // Run once on mount or whenever the initialSessionId changes (i.e. user
+  // navigated to a different session via URL).
+  useEffect(() => {
+    setMessages(storedToUIMessages(initialMessages));
+    setActiveSessionId(initialSessionId);
+    sessionIdRef.current = initialSessionId;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSessionId]);
 
   useEffect(() => {
     logEvent({
       event_type: "page_view",
       user_id: userId,
-      session_id: sessionId,
+      session_id: clientSessionId,
       metadata: { page: "chat" },
     });
     logEvent({
       event_type: "session_start",
       user_id: userId,
-      session_id: sessionId,
+      session_id: clientSessionId,
     });
-  }, [sessionId, userId]);
+  }, [clientSessionId, userId]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -72,7 +142,7 @@ export function ChatClient({
     logEvent({
       event_type: "chat_message_sent",
       user_id: userId,
-      session_id: sessionId,
+      session_id: clientSessionId,
       metadata: { length: trimmed.length },
     });
     setInput("");
@@ -82,12 +152,13 @@ export function ChatClient({
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="border-b border-border/60 bg-surface/60 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-4xl items-center justify-between px-4 py-4 sm:px-6">
+        <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <Link href="/" className="flex items-center gap-3">
             <Wordmark size="sm" />
           </Link>
-          <div className="flex items-center gap-3">
-            <span className="hidden text-xs text-ink-300 sm:inline">
+          <div className="flex items-center gap-2">
+            <ChatHistory activeSessionId={activeSessionId} />
+            <span className="hidden text-xs text-ink-300 md:inline">
               {fullName}
             </span>
             <form action="/api/auth/signout" method="post">
@@ -105,10 +176,7 @@ export function ChatClient({
 
       <MaterialsBar initialDocuments={initialDocuments} />
 
-      <main
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto"
-      >
+      <main ref={scrollRef} className="flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
           {!profileComplete && !bannerDismissed && (
             <ProfileBanner onDismiss={() => setBannerDismissed(true)} />
@@ -117,7 +185,7 @@ export function ChatClient({
           {hasMessages && (
             <ul className="flex flex-col gap-6">
               {messages.map((m) => (
-                <MessageBubble key={m.id} message={m} />
+                <MessageBubble key={m.id} message={m as UIMsg} />
               ))}
               {isResponding &&
                 messages[messages.length - 1]?.role === "user" && (
@@ -210,9 +278,10 @@ function Welcome({ onPick }: { onPick: (t: string) => void }) {
     <div className="flex flex-col items-center pt-8 text-center sm:pt-16">
       <Wordmark size="lg" />
       <p className="mt-6 max-w-xl text-lg text-ink-200">
-        Hi — I&apos;m <span className="font-semibold text-foreground">NuAnswers</span>.
-        I&apos;ll guide you through accounting and finance problems by asking the
-        right questions. I won&apos;t give you the answer — you&apos;ll get
+        Hi — I&apos;m{" "}
+        <span className="font-semibold text-foreground">NuAnswers</span>.
+        I&apos;ll guide you through accounting and finance problems by asking
+        the right questions. I won&apos;t give you the answer — you&apos;ll get
         there yourself.
       </p>
       <div className="mt-8 w-full">
@@ -234,12 +303,6 @@ function Welcome({ onPick }: { onPick: (t: string) => void }) {
     </div>
   );
 }
-
-type UIMsg = {
-  id: string;
-  role: "user" | "assistant" | "system";
-  parts?: Array<{ type: string; text?: string }>;
-};
 
 function MessageBubble({ message }: { message: UIMsg }) {
   const isUser = message.role === "user";
