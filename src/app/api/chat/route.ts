@@ -4,6 +4,7 @@ import { TUTORING_SYSTEM_PROMPT } from "@/lib/tutoring-prompt";
 import { createClient } from "@/lib/supabase/server";
 import { retrieveRelevantChunks, formatRagContext } from "@/lib/rag";
 import { profileClassContext, type Profile } from "@/lib/auth";
+import { getTutoringHoursStatus } from "@/lib/tutoring-hours";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -34,6 +35,21 @@ export async function POST(req: Request) {
       status: 401,
       headers: { "Content-Type": "application/json" },
     });
+  }
+
+  // Server-side tutoring-hours block — even if a client somehow bypasses
+  // the page-level guard, the API still refuses during the window.
+  const hoursStatus = getTutoringHoursStatus();
+  if (hoursStatus.active) {
+    return new Response(
+      JSON.stringify({
+        error: `In-person tutoring is happening right now (${hoursStatus.day} ${hoursStatus.timeET} ET). The bot returns at ${hoursStatus.windowEnd}.`,
+      }),
+      {
+        status: 423, // Locked
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
 
   const { messages, sessionId: incomingSessionId } =

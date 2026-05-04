@@ -7,6 +7,8 @@ import {
   type Profile,
 } from "@/lib/auth";
 import { isKnownProfessor } from "@/lib/professors";
+import { getTutoringHoursStatus } from "@/lib/tutoring-hours";
+import { TutoringHoursBlocker } from "./TutoringHoursBlocker";
 import type { DocumentRow } from "./MaterialsBar";
 
 type ChatPageProps = {
@@ -35,6 +37,19 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
       redirect("/professors");
     }
     redirect("/onboarding");
+  }
+
+  // In-person tutoring hours: bot pauses so students go to the chapter's
+  // in-person session instead. Skipped automatically outside the window
+  // and when TUTORING_HOURS_DISABLED=true.
+  const tutoringHours = getTutoringHoursStatus();
+  if (tutoringHours.active) {
+    return (
+      <TutoringHoursBlocker
+        status={tutoringHours}
+        email={user.email ?? ""}
+      />
+    );
   }
 
   const { data: documents } = await supabase
