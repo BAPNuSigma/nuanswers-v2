@@ -13,7 +13,7 @@ export type DocumentRow = {
   created_at: string;
 };
 
-const ACCEPT = ".pdf,.docx,.xlsx,.xls,.csv,.txt";
+const ACCEPT = ".pdf,.docx,.pptx,.xlsx,.xls,.csv,.txt";
 
 export function MaterialsBar({
   initialDocuments,
@@ -87,7 +87,7 @@ export function MaterialsBar({
   const failed = documents.filter((d) => d.status === "failed");
 
   return (
-    <div className="border-b border-border/60 bg-surface/40">
+    <div className="flex-none border-b border-border/60 bg-surface/40">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-2 px-4 py-3 sm:px-6">
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs uppercase tracking-widest text-ink-400">
@@ -118,8 +118,8 @@ export function MaterialsBar({
 
         {documents.length === 0 && !uploading && !error && (
           <p className="text-xs text-ink-400">
-            Upload your syllabus, slides, or notes (PDF, Word, Excel, CSV, TXT).
-            The tutor uses them to ground every answer in your class.
+            Upload your syllabus, slides, or notes (PDF, Word, PowerPoint, Excel,
+            CSV, TXT). The tutor uses them to ground every answer in your class.
           </p>
         )}
 
@@ -194,6 +194,7 @@ function FileTypeBadge({ ext }: { ext: string }) {
   const colorMap: Record<string, string> = {
     pdf: "bg-crimson-700/30 text-crimson-200",
     docx: "bg-blue-700/30 text-blue-200",
+    pptx: "bg-orange-700/30 text-orange-200",
     xlsx: "bg-green-700/30 text-green-200",
     xls: "bg-green-700/30 text-green-200",
     csv: "bg-green-700/30 text-green-200",

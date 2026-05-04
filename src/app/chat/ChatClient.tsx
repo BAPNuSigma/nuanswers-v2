@@ -128,6 +128,21 @@ export function ChatClient({
       user_id: userId,
       session_id: clientSessionId,
     });
+
+    // Fire session_end when the user leaves the page or closes the tab.
+    // pagehide is more reliable than beforeunload on iOS Safari.
+    function emitSessionEnd() {
+      logEvent({
+        event_type: "session_end",
+        user_id: userId,
+        session_id: clientSessionId,
+      });
+    }
+    window.addEventListener("pagehide", emitSessionEnd);
+    return () => {
+      window.removeEventListener("pagehide", emitSessionEnd);
+      emitSessionEnd();
+    };
   }, [clientSessionId, userId]);
 
   useEffect(() => {
@@ -154,8 +169,8 @@ export function ChatClient({
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <header className="border-b border-border/60 bg-surface/60 backdrop-blur">
+    <div className="flex h-dvh flex-col bg-background">
+      <header className="flex-none border-b border-border/60 bg-surface/60 backdrop-blur">
         <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <Link href="/" className="flex items-center gap-3">
             <Wordmark size="sm" />
@@ -181,7 +196,7 @@ export function ChatClient({
 
       <MaterialsBar initialDocuments={initialDocuments} />
 
-      <main ref={scrollRef} className="flex-1 overflow-y-auto">
+      <main ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
           {!profileComplete && !bannerDismissed && (
             <ProfileBanner onDismiss={() => setBannerDismissed(true)} />
@@ -206,7 +221,7 @@ export function ChatClient({
         </div>
       </main>
 
-      <footer className="border-t border-border/60 bg-surface/60 backdrop-blur">
+      <footer className="flex-none border-t border-border/60 bg-surface/60 backdrop-blur">
         <form
           onSubmit={(e) => {
             e.preventDefault();

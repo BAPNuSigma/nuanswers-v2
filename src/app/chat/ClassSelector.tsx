@@ -34,7 +34,15 @@ export function ClassSelector({
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
-    if (open) document.addEventListener("keydown", onKey);
+    if (open) {
+      document.addEventListener("keydown", onKey);
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.removeEventListener("keydown", onKey);
+        document.body.style.overflow = previousOverflow;
+      };
+    }
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 

@@ -1,6 +1,7 @@
 import { extractText as extractPdfText } from "unpdf";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
+import { parseOffice } from "officeparser";
 
 export type ExtractedDocument = {
   text: string;
@@ -11,6 +12,7 @@ export type ExtractedDocument = {
 const SUPPORTED_TYPES = [
   "pdf",
   "docx",
+  "pptx",
   "xlsx",
   "xls",
   "csv",
@@ -52,6 +54,8 @@ export async function extractText(
       return extractFromPdf(bytes);
     case "docx":
       return extractFromDocx(bytes);
+    case "pptx":
+      return extractFromPptx(bytes);
     case "xlsx":
     case "xls":
       return extractFromExcel(bytes, ext);
@@ -60,6 +64,11 @@ export async function extractText(
     case "txt":
       return { text: new TextDecoder().decode(bytes), fileType: "txt" };
   }
+}
+
+async function extractFromPptx(bytes: Uint8Array): Promise<ExtractedDocument> {
+  const ast = await parseOffice(Buffer.from(bytes));
+  return { text: ast.toText().trim(), fileType: "pptx" };
 }
 
 async function extractFromPdf(bytes: Uint8Array): Promise<ExtractedDocument> {
