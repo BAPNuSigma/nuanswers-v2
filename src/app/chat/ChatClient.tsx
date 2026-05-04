@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Wordmark } from "@/components/Wordmark";
 import { logEvent, newSessionId } from "@/lib/analytics";
+import { MaterialsBar, type DocumentRow } from "./MaterialsBar";
 
 const STARTER_QUESTIONS = [
   "How do I calculate the current ratio?",
@@ -19,6 +20,7 @@ type ChatClientProps = {
   email: string;
   fullName: string;
   profileComplete: boolean;
+  initialDocuments: DocumentRow[];
 };
 
 export function ChatClient({
@@ -26,6 +28,7 @@ export function ChatClient({
   email,
   fullName,
   profileComplete,
+  initialDocuments,
 }: ChatClientProps) {
   const sessionId = useMemo(() => newSessionId(), []);
   const [bannerDismissed, setBannerDismissed] = useState(false);
@@ -99,6 +102,8 @@ export function ChatClient({
           </div>
         </div>
       </header>
+
+      <MaterialsBar initialDocuments={initialDocuments} />
 
       <main
         ref={scrollRef}
