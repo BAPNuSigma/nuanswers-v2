@@ -55,7 +55,7 @@ export async function POST(req: Request) {
   if (!isSupportedFileType(ext)) {
     return NextResponse.json(
       {
-        error: `Unsupported file type ".${ext}". Try PDF, DOCX, PPTX, XLSX, CSV, or TXT.`,
+        error: `Unsupported file type ".${ext}". Try PDF, DOCX, PPTX, XLSX, CSV, TXT, JPG, PNG, or WebP.`,
       },
       { status: 415 }
     );

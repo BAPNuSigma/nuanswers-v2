@@ -13,7 +13,8 @@ export type DocumentRow = {
   created_at: string;
 };
 
-const ACCEPT = ".pdf,.docx,.pptx,.xlsx,.xls,.csv,.txt";
+const ACCEPT =
+  ".pdf,.docx,.pptx,.xlsx,.xls,.csv,.txt,.jpg,.jpeg,.png,.webp";
 
 export function MaterialsBar({
   initialDocuments,
@@ -118,8 +119,9 @@ export function MaterialsBar({
 
         {documents.length === 0 && !uploading && !error && (
           <p className="text-xs text-ink-400">
-            Upload your syllabus, slides, or notes (PDF, Word, PowerPoint, Excel,
-            CSV, TXT). The tutor uses them to ground every answer in your class.
+            Upload your syllabus, slides, notes, or photos of homework problems
+            (PDF, Word, PowerPoint, Excel, CSV, TXT, JPG, PNG, WebP). The tutor
+            uses them to ground every answer in your class.
           </p>
         )}
 
@@ -199,6 +201,10 @@ function FileTypeBadge({ ext }: { ext: string }) {
     xls: "bg-green-700/30 text-green-200",
     csv: "bg-green-700/30 text-green-200",
     txt: "bg-ink-600 text-ink-200",
+    jpg: "bg-purple-700/30 text-purple-200",
+    jpeg: "bg-purple-700/30 text-purple-200",
+    png: "bg-purple-700/30 text-purple-200",
+    webp: "bg-purple-700/30 text-purple-200",
   };
   const cls = colorMap[ext.toLowerCase()] ?? "bg-ink-600 text-ink-200";
   return (
