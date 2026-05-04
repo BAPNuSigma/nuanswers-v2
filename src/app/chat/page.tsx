@@ -44,6 +44,11 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
   // and when TUTORING_HOURS_DISABLED=true.
   const tutoringHours = getTutoringHoursStatus();
   if (tutoringHours.active) {
+    await supabase.from("analytics_events").insert({
+      user_id: user.id,
+      event_type: "tutoring_hours_blocked",
+      metadata: { day: tutoringHours.day, time_et: tutoringHours.timeET },
+    });
     return (
       <TutoringHoursBlocker
         status={tutoringHours}

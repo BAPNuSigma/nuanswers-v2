@@ -8,6 +8,7 @@ export type AnalyticsEventType =
   | "feedback_submitted"
   | "login"
   | "signup"
+  | "tutoring_hours_blocked"
   | "error";
 
 export type AnalyticsEvent = {

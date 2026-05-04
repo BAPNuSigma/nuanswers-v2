@@ -197,7 +197,7 @@ export async function POST(req: Request) {
   const sessionIdForCallback = sessionId; // narrow type for the closure
 
   const result = streamText({
-    model: openai("gpt-4.1"),
+    model: openai(process.env.OPENAI_MODEL ?? "gpt-4.1"),
     system: systemParts.join("\n").trim(),
     messages: modelMessages,
     temperature: 0.7,

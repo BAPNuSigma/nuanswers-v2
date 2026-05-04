@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { isFduEmail, FDU_EMAIL_HINT } from "@/lib/auth";
 import { Wordmark } from "@/components/Wordmark";
+import { logEvent } from "@/lib/analytics";
 
 type Step = "email" | "code";
 
@@ -63,7 +64,7 @@ export default function LoginPage() {
 
     setSubmitting(true);
     const supabase = createClient();
-    const { error: verifyError } = await supabase.auth.verifyOtp({
+    const { data, error: verifyError } = await supabase.auth.verifyOtp({
       email,
       token: cleaned,
       type: "email",
@@ -73,6 +74,14 @@ export default function LoginPage() {
       setError(verifyError.message);
       setSubmitting(false);
       return;
+    }
+
+    if (data.user) {
+      void logEvent({
+        event_type: "login",
+        user_id: data.user.id,
+        metadata: { method: "otp" },
+      });
     }
 
     router.replace("/chat");
