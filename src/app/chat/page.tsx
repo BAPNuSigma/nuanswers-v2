@@ -1,7 +1,11 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ChatClient, type StoredMessage } from "./ChatClient";
-import { isProfileComplete, type Profile } from "@/lib/auth";
+import {
+  isProfileComplete,
+  profileClassContext,
+  type Profile,
+} from "@/lib/auth";
 import type { DocumentRow } from "./MaterialsBar";
 
 type ChatPageProps = {
@@ -84,6 +88,7 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
       initialDocuments={(documents ?? []) as DocumentRow[]}
       initialSessionId={activeSessionId}
       initialMessages={initialMessages}
+      initialClass={profileClassContext(profile)}
     />
   );
 }

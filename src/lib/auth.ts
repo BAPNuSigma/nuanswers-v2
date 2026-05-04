@@ -46,10 +46,55 @@ export type Profile = {
   grade: Grade | null;
   campus: Campus | null;
   major: Major | null;
+  current_course_id: string | null;
+  current_course_name: string | null;
+  current_professor_name: string | null;
+  current_professor_email: string | null;
   created_at: string;
   updated_at: string;
 };
 
 export function isProfileComplete(profile: Pick<Profile, "grade" | "campus" | "major">): boolean {
   return Boolean(profile.grade && profile.campus && profile.major);
+}
+
+const COURSE_ID_RE = /^(ACCT|ECON|FIN|MIS|WMA)_\d{4}_\d{2}$/;
+
+export function isValidCourseId(id: string): boolean {
+  return COURSE_ID_RE.test(id.trim());
+}
+
+export const COURSE_ID_HINT =
+  "Format: DEPT_####_##  (e.g., ACCT_3220_01, FIN_3250_02). Allowed prefixes: ACCT, ECON, FIN, MIS, WMA.";
+
+export type ClassContext = {
+  course_id: string;
+  course_name: string;
+  professor_name: string;
+  professor_email: string;
+};
+
+export function profileClassContext(
+  profile: Pick<
+    Profile,
+    | "current_course_id"
+    | "current_course_name"
+    | "current_professor_name"
+    | "current_professor_email"
+  >
+): ClassContext | null {
+  if (
+    !profile.current_course_id ||
+    !profile.current_course_name ||
+    !profile.current_professor_name ||
+    !profile.current_professor_email
+  ) {
+    return null;
+  }
+  return {
+    course_id: profile.current_course_id,
+    course_name: profile.current_course_name,
+    professor_name: profile.current_professor_name,
+    professor_email: profile.current_professor_email,
+  };
 }

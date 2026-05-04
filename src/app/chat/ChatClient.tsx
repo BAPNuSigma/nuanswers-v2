@@ -8,6 +8,8 @@ import { Wordmark } from "@/components/Wordmark";
 import { logEvent, newSessionId } from "@/lib/analytics";
 import { MaterialsBar, type DocumentRow } from "./MaterialsBar";
 import { ChatHistory } from "./ChatHistory";
+import { ClassSelector } from "./ClassSelector";
+import type { ClassContext } from "@/lib/auth";
 
 const STARTER_QUESTIONS = [
   "How do I calculate the current ratio?",
@@ -37,6 +39,7 @@ type ChatClientProps = {
   initialDocuments: DocumentRow[];
   initialSessionId: string | null;
   initialMessages: StoredMessage[];
+  initialClass: ClassContext | null;
 };
 
 function storedToUIMessages(stored: StoredMessage[]): UIMessage[] {
@@ -58,6 +61,7 @@ export function ChatClient({
   initialDocuments,
   initialSessionId,
   initialMessages,
+  initialClass,
 }: ChatClientProps) {
   const clientSessionId = useMemo(() => newSessionId(), []);
   const [bannerDismissed, setBannerDismissed] = useState(false);
@@ -157,6 +161,7 @@ export function ChatClient({
             <Wordmark size="sm" />
           </Link>
           <div className="flex items-center gap-2">
+            <ClassSelector initialClass={initialClass} />
             <ChatHistory activeSessionId={activeSessionId} />
             <span className="hidden text-xs text-ink-300 md:inline">
               {fullName}

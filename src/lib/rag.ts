@@ -1,5 +1,6 @@
 import { embedSingle } from "@/lib/embed";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { ClassContext } from "@/lib/auth";
 
 export type RagChunk = {
   id: string;
@@ -7,6 +8,8 @@ export type RagChunk = {
   filename: string;
   content: string;
   similarity: number;
+  is_own: boolean;
+  is_shared: boolean;
 };
 
 const MIN_SIMILARITY = 0.25; // discard chunks that are clearly off-topic
@@ -16,6 +19,7 @@ export async function retrieveRelevantChunks(
   supabase: SupabaseClient,
   userId: string,
   query: string,
+  classContext: ClassContext | null,
   topK: number = TOP_K
 ): Promise<RagChunk[]> {
   if (!query.trim()) return [];
@@ -25,6 +29,8 @@ export async function retrieveRelevantChunks(
   const { data, error } = await supabase.rpc("match_document_chunks", {
     query_embedding: queryEmbedding,
     match_user_id: userId,
+    match_course_id: classContext?.course_id ?? null,
+    match_professor_email: classContext?.professor_email ?? null,
     match_count: topK,
   });
 
@@ -40,16 +46,21 @@ export async function retrieveRelevantChunks(
 /**
  * Format retrieved chunks into a system-message-friendly block.
  * The tutor sees this as authoritative context for the student's question.
+ * Chunks owned by the current student vs. shared from classmates are
+ * labelled differently so the tutor can attribute appropriately.
  */
 export function formatRagContext(chunks: RagChunk[]): string | null {
   if (!chunks.length) return null;
 
   const blocks = chunks.map((c, i) => {
-    return `--- Source ${i + 1}: ${c.filename} ---\n${c.content.trim()}`;
+    const origin = c.is_shared
+      ? "shared by a classmate in your course"
+      : "your upload";
+    return `--- Source ${i + 1}: ${c.filename} (${origin}) ---\n${c.content.trim()}`;
   });
 
   return [
-    "The student has uploaded course materials. The following excerpts are relevant to their current question. When answering, ground your guidance in these excerpts and (briefly) reference the filename when you draw from one. If the materials don't cover the question, follow rule 8 from your behavior rules.",
+    "The student has uploaded course materials, and may also have access to materials shared by classmates in the same course (same professor + same section). The following excerpts are relevant to their current question. When answering, ground your guidance in these excerpts and (briefly) reference the filename when you draw from one. If the materials don't cover the question, follow rule 8 from your behavior rules.",
     "",
     blocks.join("\n\n"),
   ].join("\n");

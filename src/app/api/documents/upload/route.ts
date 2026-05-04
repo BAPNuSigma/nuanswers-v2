@@ -61,6 +61,17 @@ export async function POST(req: Request) {
     );
   }
 
+  // Look up the user's current class so we can tag this upload with it.
+  // Files inherit class context at upload time so they're shareable with
+  // classmates in the same course.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select(
+      "current_course_id, current_course_name, current_professor_name, current_professor_email"
+    )
+    .eq("id", user.id)
+    .maybeSingle();
+
   // Insert the document row first (status: processing) so the user sees it appear
   // immediately. We update to 'ready' or 'failed' once embeddings are done.
   const { data: docRow, error: insertError } = await supabase
@@ -71,6 +82,10 @@ export async function POST(req: Request) {
       file_type: ext,
       file_size_bytes: file.size,
       status: "processing",
+      course_id: profile?.current_course_id ?? null,
+      course_name: profile?.current_course_name ?? null,
+      professor_name: profile?.current_professor_name ?? null,
+      professor_email: profile?.current_professor_email ?? null,
     })
     .select("id")
     .single();

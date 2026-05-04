@@ -3,6 +3,7 @@ import { streamText, convertToModelMessages, type UIMessage } from "ai";
 import { TUTORING_SYSTEM_PROMPT } from "@/lib/tutoring-prompt";
 import { createClient } from "@/lib/supabase/server";
 import { retrieveRelevantChunks, formatRagContext } from "@/lib/rag";
+import { profileClassContext, type Profile } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -74,25 +75,59 @@ export async function POST(req: Request) {
     );
   }
 
-  // Inventory: tell the bot which files the student actually has uploaded,
-  // so it can answer questions like "compare my two files" intelligently
-  // even when RAG doesn't return any chunks.
-  const { data: docs } = await supabase
-    .from("documents")
-    .select("filename, file_type, status")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
+  // Look up the user's profile so we know their current class context.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select(
+      "current_course_id, current_course_name, current_professor_name, current_professor_email"
+    )
+    .eq("id", user.id)
+    .maybeSingle<Profile>();
 
-  const readyDocs = (docs ?? []).filter((d) => d.status === "ready");
-  let inventoryContext = "";
-  if (readyDocs.length === 0) {
-    inventoryContext =
-      "\n\nThe student has not uploaded any course materials yet. If they reference 'my files,' 'my notes,' or anything similar, gently let them know nothing is uploaded yet and they can upload via the 'Course materials' bar above the chat.";
+  const classContext = profile ? profileClassContext(profile) : null;
+
+  // Inventory: tell the bot which files the student actually has uploaded
+  // OR has access to via classmates' shared uploads.
+  let documentsQuery = supabase
+    .from("documents")
+    .select("filename, file_type, status, user_id, course_id, professor_email")
+    .eq("status", "ready");
+
+  if (classContext) {
+    documentsQuery = documentsQuery.or(
+      `user_id.eq.${user.id},and(course_id.eq.${classContext.course_id},professor_email.eq.${classContext.professor_email})`
+    );
   } else {
-    const list = readyDocs
+    documentsQuery = documentsQuery.eq("user_id", user.id);
+  }
+  const { data: docs } = await documentsQuery.order("filename", {
+    ascending: true,
+  });
+
+  const readyDocs = docs ?? [];
+  const ownDocs = readyDocs.filter((d) => d.user_id === user.id);
+  const sharedDocs = readyDocs.filter((d) => d.user_id !== user.id);
+
+  let classLine = "";
+  if (classContext) {
+    classLine = `\n\nThe student is currently working in class: ${classContext.course_name} (${classContext.course_id}) with Professor ${classContext.professor_name}.`;
+  }
+
+  let inventoryContext = classLine;
+  if (readyDocs.length === 0) {
+    inventoryContext +=
+      "\n\nThe student has not uploaded any course materials yet, and no classmates have shared files for this course context. If they reference 'my files,' 'my notes,' or anything similar, gently let them know nothing is uploaded yet and they can upload via the 'Course materials' bar above the chat.";
+  } else {
+    const ownList = ownDocs.map((d) => `- ${d.filename} (${d.file_type})`).join("\n");
+    const sharedList = sharedDocs
       .map((d) => `- ${d.filename} (${d.file_type})`)
       .join("\n");
-    inventoryContext = `\n\nThe student has uploaded these files (this is the COMPLETE list — there are no others):\n${list}\n\nIf they reference 'my two files' or a file that isn't in this list, point out exactly which files you actually see and ask if they meant to upload more.`;
+    inventoryContext += "\n\nFiles the student has access to right now:";
+    if (ownList) inventoryContext += `\n\nUploaded by the student:\n${ownList}`;
+    if (sharedList)
+      inventoryContext += `\n\nShared by classmates in the same course:\n${sharedList}`;
+    inventoryContext +=
+      "\n\nThis is the COMPLETE list — there are no others. If they reference a file that isn't here, point out exactly which files you actually see and ask if they meant something else.";
   }
 
   // Get the latest user message text — we both save it and use it for RAG.
@@ -123,7 +158,8 @@ export async function POST(req: Request) {
       const chunks = await retrieveRelevantChunks(
         supabase,
         user.id,
-        lastUserText
+        lastUserText,
+        classContext
       );
       ragContext = formatRagContext(chunks);
       ragSources = Array.from(new Set(chunks.map((c) => c.filename)));
