@@ -177,6 +177,12 @@ export function ChatClient({
           </Link>
           <div className="flex items-center gap-2">
             <ClassSelector initialClass={initialClass} />
+            <MaterialsBar
+              initialDocuments={initialDocuments}
+              defaultProfessorLastName={professorLastName(
+                initialClass?.professor_name ?? null
+              )}
+            />
             <ChatHistory activeSessionId={activeSessionId} />
             <span className="hidden text-xs text-ink-300 md:inline">
               {fullName}
@@ -193,13 +199,6 @@ export function ChatClient({
           </div>
         </div>
       </header>
-
-      <MaterialsBar
-        initialDocuments={initialDocuments}
-        defaultProfessorLastName={professorLastName(
-          initialClass?.professor_name ?? null
-        )}
-      />
 
       <main ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">

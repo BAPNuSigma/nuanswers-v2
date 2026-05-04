@@ -28,6 +28,7 @@ export function MaterialsBar({
   const [documents, setDocuments] = useState<DocumentRow[]>(initialDocuments);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Pending files waiting for the professor-name prompt.
@@ -53,11 +54,15 @@ export function MaterialsBar({
     return () => clearInterval(t);
   }, [documents]);
 
-  // When the modal is open, lock body scroll + ESC-to-close.
+  // Body-scroll lock + ESC handling. Active when either modal is open.
   useEffect(() => {
-    if (pendingFiles.length === 0) return;
+    const anyModalOpen = panelOpen || pendingFiles.length > 0;
+    if (!anyModalOpen) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") cancelPending();
+      if (e.key === "Escape") {
+        if (pendingFiles.length > 0) cancelPending();
+        else setPanelOpen(false);
+      }
     }
     document.addEventListener("keydown", onKey);
     const previousOverflow = document.body.style.overflow;
@@ -67,7 +72,7 @@ export function MaterialsBar({
       document.body.style.overflow = previousOverflow;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingFiles.length]);
+  }, [panelOpen, pendingFiles.length]);
 
   function startUploadFlow(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -134,67 +139,120 @@ export function MaterialsBar({
     return a.localeCompare(b);
   });
 
+  const processingCount = documents.filter(
+    (d) => d.status === "processing"
+  ).length;
+
   return (
-    <div className="flex-none border-b border-border/60 bg-surface/40">
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-2 px-4 py-3 sm:px-6">
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-xs uppercase tracking-widest text-ink-400">
-            Course materials
-            {documents.length > 0 && (
-              <span className="ml-2 text-ink-300">{documents.length}</span>
-            )}
-          </span>
-
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="inline-flex h-8 items-center gap-1.5 rounded-full bg-gold-600 px-3 text-xs font-semibold text-ink-900 transition hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {uploading ? "Uploading…" : "+ Upload"}
-          </button>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={ACCEPT}
-            multiple
-            className="hidden"
-            onChange={(e) => startUploadFlow(e.target.files)}
-          />
-        </div>
-
-        {documents.length === 0 && !uploading && !error && (
-          <p className="text-xs text-ink-400">
-            Upload your syllabus, slides, notes, or photos of homework problems
-            (PDF, Word, PowerPoint, Excel, CSV, TXT, JPG, PNG, WebP). The tutor
-            uses them to ground every answer in your class.
-          </p>
-        )}
-
+    <>
+      <button
+        type="button"
+        onClick={() => setPanelOpen(true)}
+        className="relative inline-flex h-8 items-center gap-1.5 rounded-full border border-border bg-surface px-3 text-xs font-medium text-ink-200 transition hover:border-gold-600 hover:text-gold-300"
+        title="Upload and manage your course materials"
+      >
+        <span aria-hidden>📎</span>
+        <span>Materials</span>
         {documents.length > 0 && (
-          <div className="flex flex-col gap-2">
-            {groupKeys.map((key) => (
-              <ProfessorGroup
-                key={key}
-                title={key}
-                docs={groups[key]}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
+          <span className="ml-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-gold-600/30 px-1 text-[10px] font-semibold text-gold-200">
+            {documents.length}
+          </span>
         )}
+        {processingCount > 0 && (
+          <span
+            aria-hidden
+            className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-pulse rounded-full bg-gold-400"
+            title={`${processingCount} file${processingCount > 1 ? "s" : ""} indexing…`}
+          />
+        )}
+      </button>
 
-        {error && (
-          <p className="rounded-lg border border-crimson-700/60 bg-crimson-900/20 px-3 py-2 text-xs text-crimson-200">
-            {error}
-          </p>
-        )}
-      </div>
+      {panelOpen && (
+        <div
+          className="fixed inset-0 z-40 overflow-y-auto bg-black/60 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPanelOpen(false);
+          }}
+        >
+          <div
+            className="flex min-h-full items-start justify-center px-4 py-6 sm:items-center"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setPanelOpen(false);
+            }}
+          >
+            <div className="w-full max-w-lg rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-serif text-xl font-bold tracking-tight">
+                    Course materials
+                  </div>
+                  <p className="mt-1 text-xs text-ink-300">
+                    The tutor uses these to ground every answer.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPanelOpen(false)}
+                  className="-mr-2 -mt-2 inline-flex h-8 w-8 flex-none items-center justify-center rounded-full text-lg text-ink-400 transition hover:bg-surface-elevated hover:text-ink-100"
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="mb-4 inline-flex h-9 w-full items-center justify-center gap-2 rounded-full bg-gold-600 px-4 text-sm font-semibold text-ink-900 transition hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {uploading ? "Uploading…" : "+ Upload a file"}
+              </button>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPT}
+                multiple
+                className="hidden"
+                onChange={(e) => startUploadFlow(e.target.files)}
+              />
+
+              {documents.length === 0 && !uploading && !error && (
+                <p className="text-xs text-ink-400">
+                  Upload your syllabus, slides, notes, or photos of homework
+                  problems (PDF, Word, PowerPoint, Excel, CSV, TXT, JPG, PNG,
+                  WebP). Files are tagged with a professor&apos;s last name so
+                  they group together.
+                </p>
+              )}
+
+              {documents.length > 0 && (
+                <div className="flex flex-col gap-3">
+                  {groupKeys.map((key) => (
+                    <ProfessorGroup
+                      key={key}
+                      title={key}
+                      docs={groups[key]}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {error && (
+                <p className="mt-3 rounded-lg border border-crimson-700/60 bg-crimson-900/20 px-3 py-2 text-xs text-crimson-200">
+                  {error}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {pendingFiles.length > 0 && (
         <div
-          className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm"
           onClick={(e) => {
             if (e.target === e.currentTarget) cancelPending();
           }}
@@ -206,14 +264,27 @@ export function MaterialsBar({
             }}
           >
             <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl">
-              <div className="mb-1 font-serif text-xl font-bold tracking-tight">
-                Which professor is{" "}
-                {pendingFiles.length === 1 ? "this for?" : "this group for?"}
+              <div className="mb-1 flex items-start justify-between gap-3">
+                <div className="font-serif text-xl font-bold tracking-tight">
+                  Which professor is{" "}
+                  {pendingFiles.length === 1 ? "this for?" : "this group for?"}
+                </div>
+                <button
+                  type="button"
+                  onClick={cancelPending}
+                  className="-mr-2 -mt-2 inline-flex h-8 w-8 flex-none items-center justify-center rounded-full text-lg text-ink-400 transition hover:bg-surface-elevated hover:text-ink-100"
+                  aria-label="Cancel"
+                >
+                  ×
+                </button>
               </div>
               <p className="mb-4 text-xs text-ink-300">
-                Tag {pendingFiles.length === 1 ? "this file" : `these ${pendingFiles.length} files`}{" "}
-                with a professor&apos;s last name so they group together. You
-                can leave it blank to keep them unsorted.
+                Tag{" "}
+                {pendingFiles.length === 1
+                  ? "this file"
+                  : `these ${pendingFiles.length} files`}{" "}
+                with a professor&apos;s last name so they group together. Leave
+                blank to keep them unsorted.
               </p>
 
               <ul className="mb-4 flex flex-col gap-1 text-xs text-ink-200">
@@ -258,7 +329,7 @@ export function MaterialsBar({
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
