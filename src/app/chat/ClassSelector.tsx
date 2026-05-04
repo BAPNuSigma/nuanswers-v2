@@ -151,15 +151,21 @@ export function ClassSelector({
 
       {open && (
         <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm"
           onClick={(e) => {
             if (e.target === e.currentTarget) setOpen(false);
           }}
         >
           <div
-            ref={dialogRef}
-            className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl"
+            className="flex min-h-full items-center justify-center px-4 py-6"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setOpen(false);
+            }}
           >
+            <div
+              ref={dialogRef}
+              className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl"
+            >
             <div className="mb-1 font-serif text-xl font-bold tracking-tight">
               Your current class
             </div>
@@ -250,6 +256,7 @@ export function ClassSelector({
                 </div>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}

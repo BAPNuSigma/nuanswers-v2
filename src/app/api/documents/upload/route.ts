@@ -13,6 +13,32 @@ export const maxDuration = 60;
 
 const MAX_FILE_BYTES = 4 * 1024 * 1024; // 4 MB — Vercel Hobby request body cap
 
+const SUPPORTED_LIST = "PDF, DOCX, PPTX, XLSX, CSV, TXT, JPG, PNG, or WebP";
+
+// Common legacy/proprietary formats students upload by mistake. Each gets a
+// concrete next step instead of a generic "unsupported" message — based on
+// real bug reports from BAP Nu Sigma students.
+const LEGACY_FORMAT_HINTS: Record<string, string> = {
+  ppt: 'Old PowerPoint files (.ppt) aren\'t supported. Open the file in PowerPoint or Google Slides, choose "Save As" → PowerPoint Presentation (.pptx), and upload that.',
+  doc: 'Old Word files (.doc) aren\'t supported. Open the file in Word or Google Docs, choose "Save As" → Word Document (.docx), and upload that.',
+  key: "Apple Keynote files (.key) aren't supported. In Keynote, choose File → Export To → PowerPoint (or PDF), and upload that.",
+  pages:
+    "Apple Pages files (.pages) aren't supported. In Pages, choose File → Export To → Word (.docx) or PDF, and upload that.",
+  numbers:
+    "Apple Numbers files (.numbers) aren't supported. In Numbers, choose File → Export To → Excel (.xlsx) or CSV, and upload that.",
+  heic: 'iPhone HEIC photos aren\'t supported. On your iPhone, open Settings → Camera → Formats and pick "Most Compatible" — new photos will save as JPEG. For an existing photo, open it in Photos, tap Share, then "Save to Files" usually re-saves as JPEG.',
+  odp: "OpenDocument Presentation (.odp) isn't supported. Export to PowerPoint (.pptx) or PDF first.",
+  odt: "OpenDocument Text (.odt) isn't supported. Export to Word (.docx) or PDF first.",
+  ods: "OpenDocument Spreadsheet (.ods) isn't supported. Export to Excel (.xlsx) or CSV first.",
+};
+
+function unsupportedTypeMessage(ext: string): string {
+  const hint = LEGACY_FORMAT_HINTS[ext.toLowerCase()];
+  if (hint) return hint;
+  if (!ext) return `That file has no extension. Supported types: ${SUPPORTED_LIST}.`;
+  return `Unsupported file type ".${ext}". Supported types: ${SUPPORTED_LIST}.`;
+}
+
 export async function POST(req: Request) {
   const supabase = await createClient();
   const {
@@ -54,9 +80,7 @@ export async function POST(req: Request) {
   const ext = getFileExtension(file.name);
   if (!isSupportedFileType(ext)) {
     return NextResponse.json(
-      {
-        error: `Unsupported file type ".${ext}". Try PDF, DOCX, PPTX, XLSX, CSV, TXT, JPG, PNG, or WebP.`,
-      },
+      { error: unsupportedTypeMessage(ext) },
       { status: 415 }
     );
   }
