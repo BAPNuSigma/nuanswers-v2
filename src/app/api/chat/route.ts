@@ -39,11 +39,22 @@ export async function POST(req: Request) {
   const { messages, sessionId: incomingSessionId } =
     (await req.json()) as ChatRequestBody;
 
+  // Look up the user's profile so we know their current class context.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select(
+      "current_course_id, current_course_name, current_professor_name, current_professor_email"
+    )
+    .eq("id", user.id)
+    .maybeSingle<Profile>();
+
+  const classContext = profile ? profileClassContext(profile) : null;
+
   // Resolve session_id — create one on the fly if the client didn't provide.
+  // New sessions snapshot the user's current class context so professors can
+  // see analytics scoped to their own students.
   let sessionId = incomingSessionId ?? null;
   if (sessionId) {
-    // Make sure the session belongs to this user (RLS will already block, but
-    // this gives a friendlier error).
     const { data: existing } = await supabase
       .from("chat_sessions")
       .select("id")
@@ -55,7 +66,13 @@ export async function POST(req: Request) {
   if (!sessionId) {
     const { data: newSession, error: newSessionError } = await supabase
       .from("chat_sessions")
-      .insert({ user_id: user.id })
+      .insert({
+        user_id: user.id,
+        course_name: classContext?.course_name ?? null,
+        course_id: classContext?.course_id ?? null,
+        professor: classContext?.professor_name ?? null,
+        professor_email: classContext?.professor_email ?? null,
+      })
       .select("id")
       .single();
     if (newSessionError || !newSession) {
@@ -68,23 +85,11 @@ export async function POST(req: Request) {
   }
 
   if (!sessionId) {
-    // unreachable in practice — both branches above either set or return
     return new Response(
       JSON.stringify({ error: "Could not establish session." }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
-
-  // Look up the user's profile so we know their current class context.
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select(
-      "current_course_id, current_course_name, current_professor_name, current_professor_email"
-    )
-    .eq("id", user.id)
-    .maybeSingle<Profile>();
-
-  const classContext = profile ? profileClassContext(profile) : null;
 
   // Inventory: tell the bot which files the student actually has uploaded
   // OR has access to via classmates' shared uploads.

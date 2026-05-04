@@ -6,6 +6,7 @@ import {
   profileClassContext,
   type Profile,
 } from "@/lib/auth";
+import { isKnownProfessor } from "@/lib/professors";
 import type { DocumentRow } from "./MaterialsBar";
 
 type ChatPageProps = {
@@ -26,7 +27,15 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
     .eq("id", user.id)
     .maybeSingle<Profile>();
 
-  if (!profile) redirect("/onboarding");
+  if (!profile) {
+    // No student profile yet. If their email is listed as a professor by
+    // any student, route them to the professor dashboard instead of
+    // pushing them through student onboarding.
+    if (user.email && (await isKnownProfessor(supabase, user.email))) {
+      redirect("/professors");
+    }
+    redirect("/onboarding");
+  }
 
   const { data: documents } = await supabase
     .from("documents")
