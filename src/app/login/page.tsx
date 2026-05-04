@@ -29,10 +29,13 @@ export default function LoginPage() {
 
     setSubmitting(true);
     const supabase = createClient();
+    // No `emailRedirectTo` — we're using code-based OTP, not magic links.
+    // Omitting it prevents Supabase from generating a clickable link in the
+    // email at all, which neutralizes the Microsoft 365 "Safe Links" preview-
+    // click problem (the link can't be pre-consumed if it doesn't exist).
     const { error: signInError } = await supabase.auth.signInWithOtp({
       email: trimmed,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
         shouldCreateUser: true,
       },
     });
@@ -53,8 +56,8 @@ export default function LoginPage() {
     setError(null);
 
     const cleaned = code.replace(/\D/g, "");
-    if (cleaned.length !== 6) {
-      setError("Enter the 6-digit code from your email.");
+    if (cleaned.length < 4) {
+      setError("Enter the code from your email.");
       return;
     }
 
@@ -97,8 +100,8 @@ export default function LoginPage() {
         </h1>
         <p className="mt-3 text-sm text-ink-300">
           {step === "email"
-            ? "Enter your FDU email — we'll text you a 6-digit code. No password to remember."
-            : `Enter the 6-digit code we sent to ${email}.`}
+            ? "Enter your FDU email — we'll send a sign-in code. No password to remember."
+            : `Enter the code we sent to ${email}.`}
         </p>
 
         {step === "email" && (
@@ -140,20 +143,20 @@ export default function LoginPage() {
           <form onSubmit={handleVerifyCode} className="mt-8 flex flex-col gap-4">
             <label className="flex flex-col gap-2">
               <span className="text-sm font-medium text-ink-200">
-                6-digit code
+                Sign-in code
               </span>
               <input
                 type="text"
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                pattern="\d{6}"
-                maxLength={6}
+                pattern="\d{4,10}"
+                maxLength={10}
                 required
                 autoFocus
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                placeholder="123456"
-                className="rounded-xl border border-border bg-surface px-4 py-3 text-center text-2xl tracking-[0.5em] font-mono text-foreground placeholder:text-ink-500 focus:border-gold-600 focus:outline-none focus:ring-2 focus:ring-gold-600/30"
+                placeholder="12345678"
+                className="rounded-xl border border-border bg-surface px-4 py-3 text-center text-2xl tracking-[0.4em] font-mono text-foreground placeholder:text-ink-500 focus:border-gold-600 focus:outline-none focus:ring-2 focus:ring-gold-600/30"
               />
               <span className="text-xs text-ink-400">
                 Check your inbox AND spam folder. Code expires in 1 hour.
@@ -168,7 +171,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={submitting || code.length !== 6}
+              disabled={submitting || code.length < 4}
               className="mt-2 inline-flex h-12 items-center justify-center rounded-xl bg-crimson-700 font-semibold text-white transition hover:bg-crimson-600 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {submitting ? "Verifying…" : "Verify and sign in"}
