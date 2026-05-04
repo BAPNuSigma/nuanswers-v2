@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   COURSE_ID_HINT,
@@ -149,9 +150,9 @@ export function ClassSelector({
         </span>
       </button>
 
-      {open && (
+      {open && typeof document !== "undefined" && createPortal(
         <div
-          className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] overflow-y-auto bg-black/60 backdrop-blur-sm"
           onClick={(e) => {
             if (e.target === e.currentTarget) setOpen(false);
           }}
@@ -258,7 +259,8 @@ export function ClassSelector({
             </form>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { professorLastName } from "@/lib/auth";
 
 export type DocumentRow = {
@@ -167,9 +168,9 @@ export function MaterialsBar({
         )}
       </button>
 
-      {panelOpen && (
+      {panelOpen && typeof document !== "undefined" && createPortal(
         <div
-          className="fixed inset-0 z-40 overflow-y-auto bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] overflow-y-auto bg-black/60 backdrop-blur-sm"
           onClick={(e) => {
             if (e.target === e.currentTarget) setPanelOpen(false);
           }}
@@ -247,12 +248,13 @@ export function MaterialsBar({
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {pendingFiles.length > 0 && (
+      {pendingFiles.length > 0 && typeof document !== "undefined" && createPortal(
         <div
-          className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm"
+          className="fixed inset-0 z-[110] overflow-y-auto bg-black/70 backdrop-blur-sm"
           onClick={(e) => {
             if (e.target === e.currentTarget) cancelPending();
           }}
@@ -327,7 +329,8 @@ export function MaterialsBar({
               </form>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
