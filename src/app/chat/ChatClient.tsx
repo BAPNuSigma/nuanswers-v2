@@ -9,7 +9,7 @@ import { logEvent, newSessionId } from "@/lib/analytics";
 import { MaterialsBar, type DocumentRow } from "./MaterialsBar";
 import { ChatHistory } from "./ChatHistory";
 import { ClassSelector } from "./ClassSelector";
-import type { ClassContext } from "@/lib/auth";
+import { professorLastName, type ClassContext } from "@/lib/auth";
 
 const STARTER_QUESTIONS = [
   "How do I calculate the current ratio?",
@@ -194,7 +194,12 @@ export function ChatClient({
         </div>
       </header>
 
-      <MaterialsBar initialDocuments={initialDocuments} />
+      <MaterialsBar
+        initialDocuments={initialDocuments}
+        defaultProfessorLastName={professorLastName(
+          initialClass?.professor_name ?? null
+        )}
+      />
 
       <main ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">

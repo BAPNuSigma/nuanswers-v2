@@ -74,6 +74,19 @@ export type ClassContext = {
   professor_email: string;
 };
 
+/**
+ * Extract a professor's last name from a free-form name string. Handles
+ * "Dr. Jane Smith" → "Smith", "Jane Smith" → "Smith", "Smith" → "Smith",
+ * empty/null → "" so callers can decide a default.
+ */
+export function professorLastName(fullName: string | null | undefined): string {
+  if (!fullName) return "";
+  const trimmed = fullName.trim();
+  if (!trimmed) return "";
+  const parts = trimmed.split(/\s+/);
+  return parts[parts.length - 1];
+}
+
 export function profileClassContext(
   profile: Pick<
     Profile,

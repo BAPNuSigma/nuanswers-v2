@@ -60,7 +60,7 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
   const { data: documents } = await supabase
     .from("documents")
     .select(
-      "id, filename, file_type, file_size_bytes, chunk_count, status, error_message, created_at"
+      "id, filename, file_type, file_size_bytes, chunk_count, status, error_message, created_at, professor_name"
     )
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });

@@ -15,7 +15,9 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("documents")
-    .select("id, filename, file_type, file_size_bytes, chunk_count, status, error_message, created_at")
+    .select(
+      "id, filename, file_type, file_size_bytes, chunk_count, status, error_message, created_at, professor_name"
+    )
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 

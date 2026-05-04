@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { professorLastName } from "@/lib/auth";
 
 export type DocumentRow = {
   id: string;
@@ -11,6 +12,7 @@ export type DocumentRow = {
   status: "processing" | "ready" | "failed";
   error_message: string | null;
   created_at: string;
+  professor_name: string | null;
 };
 
 const ACCEPT =
@@ -18,13 +20,19 @@ const ACCEPT =
 
 export function MaterialsBar({
   initialDocuments,
+  defaultProfessorLastName,
 }: {
   initialDocuments: DocumentRow[];
+  defaultProfessorLastName: string;
 }) {
   const [documents, setDocuments] = useState<DocumentRow[]>(initialDocuments);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Pending files waiting for the professor-name prompt.
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [profInput, setProfInput] = useState("");
 
   async function refreshDocuments() {
     try {
@@ -45,15 +53,48 @@ export function MaterialsBar({
     return () => clearInterval(t);
   }, [documents]);
 
-  async function handleFiles(files: FileList | null) {
+  // When the modal is open, lock body scroll + ESC-to-close.
+  useEffect(() => {
+    if (pendingFiles.length === 0) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") cancelPending();
+    }
+    document.addEventListener("keydown", onKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingFiles.length]);
+
+  function startUploadFlow(files: FileList | null) {
     if (!files || files.length === 0) return;
     setError(null);
+    setPendingFiles(Array.from(files));
+    setProfInput(defaultProfessorLastName);
+  }
+
+  function cancelPending() {
+    setPendingFiles([]);
+    setProfInput("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function confirmPending(e: FormEvent) {
+    e.preventDefault();
+    const lastName = profInput.trim();
+    const filesToUpload = pendingFiles;
+    setPendingFiles([]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
     setUploading(true);
 
-    for (const file of Array.from(files)) {
+    for (const file of filesToUpload) {
       try {
         const form = new FormData();
         form.append("file", file);
+        if (lastName) form.append("professor_last_name", lastName);
         const res = await fetch("/api/documents/upload", {
           method: "POST",
           body: form,
@@ -69,7 +110,6 @@ export function MaterialsBar({
     }
 
     setUploading(false);
-    if (fileInputRef.current) fileInputRef.current.value = "";
     await refreshDocuments();
   }
 
@@ -83,9 +123,16 @@ export function MaterialsBar({
     await refreshDocuments();
   }
 
-  const ready = documents.filter((d) => d.status === "ready");
-  const processing = documents.filter((d) => d.status === "processing");
-  const failed = documents.filter((d) => d.status === "failed");
+  // Group documents by normalized professor last name. Old documents that
+  // were uploaded before the per-upload prompt existed will have full names
+  // like "Dr. Jane Smith" — we collapse those to "Smith" for the group key
+  // so old + new files end up together.
+  const groups = groupByProfessor(documents);
+  const groupKeys = Object.keys(groups).sort((a, b) => {
+    if (a === "Unsorted") return 1;
+    if (b === "Unsorted") return -1;
+    return a.localeCompare(b);
+  });
 
   return (
     <div className="flex-none border-b border-border/60 bg-surface/40">
@@ -113,7 +160,7 @@ export function MaterialsBar({
             accept={ACCEPT}
             multiple
             className="hidden"
-            onChange={(e) => handleFiles(e.target.files)}
+            onChange={(e) => startUploadFlow(e.target.files)}
           />
         </div>
 
@@ -126,15 +173,14 @@ export function MaterialsBar({
         )}
 
         {documents.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {ready.map((d) => (
-              <DocChip key={d.id} doc={d} onDelete={handleDelete} />
-            ))}
-            {processing.map((d) => (
-              <DocChip key={d.id} doc={d} onDelete={handleDelete} />
-            ))}
-            {failed.map((d) => (
-              <DocChip key={d.id} doc={d} onDelete={handleDelete} />
+          <div className="flex flex-col gap-2">
+            {groupKeys.map((key) => (
+              <ProfessorGroup
+                key={key}
+                title={key}
+                docs={groups[key]}
+                onDelete={handleDelete}
+              />
             ))}
           </div>
         )}
@@ -145,8 +191,121 @@ export function MaterialsBar({
           </p>
         )}
       </div>
+
+      {pendingFiles.length > 0 && (
+        <div
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) cancelPending();
+          }}
+        >
+          <div
+            className="flex min-h-full items-center justify-center px-4 py-6"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) cancelPending();
+            }}
+          >
+            <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+              <div className="mb-1 font-serif text-xl font-bold tracking-tight">
+                Which professor is{" "}
+                {pendingFiles.length === 1 ? "this for?" : "this group for?"}
+              </div>
+              <p className="mb-4 text-xs text-ink-300">
+                Tag {pendingFiles.length === 1 ? "this file" : `these ${pendingFiles.length} files`}{" "}
+                with a professor&apos;s last name so they group together. You
+                can leave it blank to keep them unsorted.
+              </p>
+
+              <ul className="mb-4 flex flex-col gap-1 text-xs text-ink-200">
+                {pendingFiles.map((f) => (
+                  <li key={f.name} className="truncate">
+                    • {f.name}
+                  </li>
+                ))}
+              </ul>
+
+              <form onSubmit={confirmPending} className="flex flex-col gap-3">
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-medium uppercase tracking-wider text-ink-300">
+                    Professor&apos;s last name
+                  </span>
+                  <input
+                    autoFocus
+                    value={profInput}
+                    onChange={(e) => setProfInput(e.target.value)}
+                    placeholder="Smith"
+                    className="w-full rounded-xl border border-border bg-surface-elevated px-3 py-2 text-sm text-foreground placeholder:text-ink-400 focus:border-gold-600 focus:outline-none focus:ring-2 focus:ring-gold-600/30"
+                  />
+                </label>
+
+                <div className="mt-1 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={cancelPending}
+                    className="rounded-full border border-border px-4 py-2 text-sm text-ink-200 hover:border-ink-400"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded-full bg-crimson-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-crimson-600"
+                  >
+                    Upload
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function ProfessorGroup({
+  title,
+  docs,
+  onDelete,
+}: {
+  title: string;
+  docs: DocumentRow[];
+  onDelete: (id: string) => void;
+}) {
+  const ready = docs.filter((d) => d.status === "ready");
+  const processing = docs.filter((d) => d.status === "processing");
+  const failed = docs.filter((d) => d.status === "failed");
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="text-[11px] font-medium uppercase tracking-widest text-ink-400">
+        {title === "Unsorted" ? "Unsorted" : `Prof. ${title}`}
+        <span className="ml-2 text-ink-500">{docs.length}</span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {ready.map((d) => (
+          <DocChip key={d.id} doc={d} onDelete={onDelete} />
+        ))}
+        {processing.map((d) => (
+          <DocChip key={d.id} doc={d} onDelete={onDelete} />
+        ))}
+        {failed.map((d) => (
+          <DocChip key={d.id} doc={d} onDelete={onDelete} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function groupByProfessor(
+  docs: DocumentRow[]
+): Record<string, DocumentRow[]> {
+  const out: Record<string, DocumentRow[]> = {};
+  for (const d of docs) {
+    const key = professorLastName(d.professor_name) || "Unsorted";
+    if (!out[key]) out[key] = [];
+    out[key].push(d);
+  }
+  return out;
 }
 
 function DocChip({

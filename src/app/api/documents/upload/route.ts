@@ -11,7 +11,10 @@ import { embedTexts } from "@/lib/embed";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MAX_FILE_BYTES = 4 * 1024 * 1024; // 4 MB — Vercel Hobby request body cap
+// 4.5 MB matches Vercel's Hobby-plan request body cap exactly. Files larger
+// than this need to bypass the API route entirely (Supabase Storage upload
+// from the browser) — that's a separate refactor.
+const MAX_FILE_BYTES = Math.floor(4.5 * 1024 * 1024);
 
 const SUPPORTED_LIST = "PDF, DOCX, PPTX, XLSX, CSV, TXT, JPG, PNG, or WebP";
 
@@ -85,9 +88,17 @@ export async function POST(req: Request) {
     );
   }
 
+  // Per-upload professor tag from the modal. This is just a last name and is
+  // for the student's own organization (so files group under "Prof. Smith").
+  // It overrides whatever's in the user's class context for display purposes.
+  // Sharing still uses professor_email from the class context.
+  const profLastNameRaw = form.get("professor_last_name");
+  const professorLastName =
+    typeof profLastNameRaw === "string" ? profLastNameRaw.trim() : "";
+
   // Look up the user's current class so we can tag this upload with it.
-  // Files inherit class context at upload time so they're shareable with
-  // classmates in the same course.
+  // Files inherit class context (course_id, professor_email) at upload time
+  // so they're shareable with classmates in the same course section.
   const { data: profile } = await supabase
     .from("profiles")
     .select(
@@ -95,6 +106,13 @@ export async function POST(req: Request) {
     )
     .eq("id", user.id)
     .maybeSingle();
+
+  // Display name: per-upload last name wins; otherwise fall back to the
+  // class context's full professor name. Either is fine for display.
+  const displayProfName =
+    professorLastName ||
+    profile?.current_professor_name ||
+    null;
 
   // Insert the document row first (status: processing) so the user sees it appear
   // immediately. We update to 'ready' or 'failed' once embeddings are done.
@@ -108,7 +126,7 @@ export async function POST(req: Request) {
       status: "processing",
       course_id: profile?.current_course_id ?? null,
       course_name: profile?.current_course_name ?? null,
-      professor_name: profile?.current_professor_name ?? null,
+      professor_name: displayProfName,
       professor_email: profile?.current_professor_email ?? null,
     })
     .select("id")
