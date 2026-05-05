@@ -1,17 +1,28 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { Wordmark } from "@/components/Wordmark";
+import { isStaffSignedIn } from "@/lib/staff-auth";
+import { StaffSignOutButton } from "@/components/StaffSignOutButton";
 
-export default async function ProfessorsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+type Props = {
+  searchParams: Promise<{ email?: string }>;
+};
 
-  const profEmail = (user.email ?? "").toLowerCase();
-  if (!profEmail) redirect("/login");
+export default async function ProfessorsPage({ searchParams }: Props) {
+  if (!(await isStaffSignedIn())) {
+    redirect("/staff-signin?next=/professors");
+  }
+
+  const { email } = await searchParams;
+  const supabase = createAdminClient();
+
+  // No email filter → directory view (list of all profs with summaries).
+  if (!email) {
+    return <ProfessorDirectory supabase={supabase} />;
+  }
+
+  const profEmail = email.trim().toLowerCase();
 
   // ---- aggregate stats for this professor's classes ----
   const sinceDays = 14;
@@ -103,17 +114,22 @@ export default async function ProfessorsPage() {
             <Wordmark size="md" />
           </Link>
           <div className="flex items-center gap-3">
-            <span className="hidden text-xs text-ink-300 sm:inline">
-              Professor view · {profEmail}
+            <span className="hidden truncate text-xs text-ink-300 sm:inline">
+              Prof. view · {profEmail}
             </span>
-            <form action="/api/auth/signout" method="post">
-              <button
-                type="submit"
-                className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-ink-200 transition hover:border-gold-600 hover:text-gold-300"
-              >
-                Sign out
-              </button>
-            </form>
+            <Link
+              href="/professors"
+              className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-ink-200 transition hover:border-gold-600 hover:text-gold-300"
+            >
+              ← All profs
+            </Link>
+            <Link
+              href="/admin"
+              className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-ink-200 transition hover:border-gold-600 hover:text-gold-300"
+            >
+              Officer view
+            </Link>
+            <StaffSignOutButton />
           </div>
         </div>
       </header>
@@ -301,6 +317,159 @@ function EmptyState({ email }: { email: string }) {
         with your class — students sign in with their FDU email, set their
         course + professor, and start chatting.
       </p>
+    </div>
+  );
+}
+
+type ProfessorSummary = {
+  email: string;
+  name: string | null;
+  sessions: number;
+  students: Set<string>;
+  courses: Set<string>;
+};
+
+async function ProfessorDirectory({
+  supabase,
+}: {
+  supabase: ReturnType<typeof createAdminClient>;
+}) {
+  // Build the directory from chat_sessions (the source of truth for a
+  // student-prof relationship). One row per session, group by professor email.
+  const { data: sessions } = await supabase
+    .from("chat_sessions")
+    .select("user_id, professor_email, professor_name, course_id, course_name")
+    .not("professor_email", "is", null);
+
+  const byEmail = new Map<string, ProfessorSummary>();
+  for (const s of sessions ?? []) {
+    const e = (s.professor_email ?? "").toLowerCase();
+    if (!e) continue;
+    let entry = byEmail.get(e);
+    if (!entry) {
+      entry = {
+        email: e,
+        name: s.professor_name ?? null,
+        sessions: 0,
+        students: new Set(),
+        courses: new Set(),
+      };
+      byEmail.set(e, entry);
+    }
+    entry.sessions += 1;
+    if (s.user_id) entry.students.add(s.user_id);
+    if (s.course_id) entry.courses.add(s.course_id);
+    if (!entry.name && s.professor_name) entry.name = s.professor_name;
+  }
+
+  // Also pull profs students have set on their profile but who haven't shown
+  // up in a chat session yet — so they appear in the directory with zero
+  // activity rather than being invisible.
+  const { data: profileProfs } = await supabase
+    .from("profiles")
+    .select("current_professor_email, current_professor_name, current_course_id")
+    .not("current_professor_email", "is", null);
+
+  for (const p of profileProfs ?? []) {
+    const e = (p.current_professor_email ?? "").toLowerCase();
+    if (!e || byEmail.has(e)) continue;
+    byEmail.set(e, {
+      email: e,
+      name: p.current_professor_name ?? null,
+      sessions: 0,
+      students: new Set(),
+      courses: p.current_course_id ? new Set([p.current_course_id]) : new Set(),
+    });
+  }
+
+  const directory = Array.from(byEmail.values()).sort(
+    (a, b) => b.sessions - a.sessions
+  );
+
+  return (
+    <div className="flex min-h-screen flex-col bg-background bg-grain">
+      <header className="border-b border-border/60">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5 sm:px-8">
+          <Link href="/">
+            <Wordmark size="md" />
+          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/admin"
+              className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-ink-200 transition hover:border-gold-600 hover:text-gold-300"
+            >
+              Officer view
+            </Link>
+            <Link
+              href="/chat"
+              className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-ink-200 transition hover:border-gold-600 hover:text-gold-300"
+            >
+              Tutor view
+            </Link>
+            <StaffSignOutButton />
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10 sm:px-8">
+        <div className="mb-8 flex flex-col gap-1">
+          <span className="text-xs uppercase tracking-widest text-gold-400">
+            Professor directory
+          </span>
+          <h1 className="font-serif text-3xl font-bold tracking-tight sm:text-4xl">
+            All professors using NuAnswers
+          </h1>
+          <p className="text-sm text-ink-300">
+            Click a professor to drill into their per-class detail view.
+          </p>
+        </div>
+
+        {directory.length === 0 ? (
+          <div className="rounded-2xl border border-gold-700/40 bg-gold-900/15 p-8 text-center">
+            <div className="font-serif text-xl text-gold-200">No professors yet</div>
+            <p className="mx-auto mt-3 max-w-md text-sm text-ink-200">
+              Professors show up here once at least one student lists them in
+              &ldquo;Pick your class&rdquo; in the chat.
+            </p>
+          </div>
+        ) : (
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {directory.map((p) => (
+              <li key={p.email}>
+                <Link
+                  href={`/professors?email=${encodeURIComponent(p.email)}`}
+                  className="block rounded-2xl border border-border bg-surface p-5 transition hover:border-gold-600 hover:bg-surface-elevated"
+                >
+                  <div className="font-serif text-lg font-semibold">
+                    {p.name ?? "Unnamed professor"}
+                  </div>
+                  <div className="mt-1 truncate text-xs text-ink-400">
+                    {p.email}
+                  </div>
+                  <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                    <Mini label="Students" value={p.students.size} />
+                    <Mini label="Sessions" value={p.sessions} />
+                    <Mini label="Courses" value={p.courses.size} />
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </main>
+    </div>
+  );
+}
+
+function Mini({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <div className="font-serif text-xl font-bold text-foreground">
+        {value}
+      </div>
+      <div className="text-[10px] uppercase tracking-widest text-ink-400">
+        {label}
+      </div>
     </div>
   );
 }

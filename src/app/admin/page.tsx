@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { Wordmark } from "@/components/Wordmark";
-import { isAdminEmail } from "@/lib/admin";
+import { isStaffSignedIn } from "@/lib/staff-auth";
+import { StaffSignOutButton } from "@/components/StaffSignOutButton";
 
 // Chapter rollup. Today every NuAnswers user is on the BAP Nu Sigma (FDU)
 // chapter. As more chapters join we'll add a `chapter` column to profiles
@@ -11,14 +12,13 @@ import { isAdminEmail } from "@/lib/admin";
 const CURRENT_CHAPTER = "Nu Sigma · FDU";
 
 export default async function AdminPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!(await isStaffSignedIn())) {
+    redirect("/staff-signin?next=/admin");
+  }
 
-  const email = (user.email ?? "").toLowerCase();
-  if (!isAdminEmail(email)) redirect("/chat");
+  // Service-role client bypasses RLS so we can aggregate across every user.
+  // Safe here because the page is gated by isStaffSignedIn() above.
+  const supabase = createAdminClient();
 
   // ---- counts ----
   const sinceDays = 30;
@@ -166,22 +166,21 @@ export default async function AdminPage() {
           </Link>
           <div className="flex items-center gap-3">
             <span className="hidden text-xs text-ink-300 sm:inline">
-              Admin · {email}
+              Officer view
             </span>
+            <Link
+              href="/professors"
+              className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-ink-200 transition hover:border-gold-600 hover:text-gold-300"
+            >
+              Professor view
+            </Link>
             <Link
               href="/chat"
               className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-ink-200 transition hover:border-gold-600 hover:text-gold-300"
             >
               Tutor view
             </Link>
-            <form action="/api/auth/signout" method="post">
-              <button
-                type="submit"
-                className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-ink-200 transition hover:border-gold-600 hover:text-gold-300"
-              >
-                Sign out
-              </button>
-            </form>
+            <StaffSignOutButton />
           </div>
         </div>
       </header>

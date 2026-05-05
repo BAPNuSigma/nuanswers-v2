@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { isAdminEmail } from "@/lib/admin";
-import { isKnownProfessor } from "@/lib/professors";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -31,26 +29,13 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/login?error=no_user`);
   }
 
-  // If the URL pinned a `next=...`, honor it (e.g. came back from /admin).
   if (explicitNext) {
     return NextResponse.redirect(`${origin}${explicitNext}`);
   }
 
-  const email = user.email ?? "";
-
-  // Admins land on /admin by default. They can still navigate to /chat or
-  // /professors from there if they want to test other surfaces.
-  if (isAdminEmail(email)) {
-    return NextResponse.redirect(`${origin}/admin`);
-  }
-
-  // Professors (recognized by being listed on a student's class context)
-  // go to /professors.
-  if (email && (await isKnownProfessor(supabase, email))) {
-    return NextResponse.redirect(`${origin}/professors`);
-  }
-
-  // Students: /onboarding if no profile yet, else /chat.
+  // /admin and /professors are gated by the staff password (separate from
+  // student auth) — see /staff-signin. Student callback always heads to
+  // /onboarding (if no profile) or /chat.
   const { data: profile } = await supabase
     .from("profiles")
     .select("id")
