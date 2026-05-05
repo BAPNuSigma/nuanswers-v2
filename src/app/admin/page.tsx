@@ -62,7 +62,7 @@ export default async function AdminPage() {
       .gte("created_at", sinceISO),
     supabase
       .from("messages")
-      .select("content, created_at")
+      .select("content, created_at, user_id, session_id")
       .eq("role", "user")
       .order("created_at", { ascending: false })
       .limit(500),
@@ -88,7 +88,42 @@ export default async function AdminPage() {
   const documents = documentsRes.data ?? [];
   const professorRows = professorsRes.data ?? [];
   const events = eventsRes.data ?? [];
-  const recentMessages = recentMessagesRes.data ?? [];
+  const recentMessages = (recentMessagesRes.data ?? []) as Array<{
+    content: string;
+    created_at: string;
+    user_id: string | null;
+    session_id: string | null;
+  }>;
+
+  // Build lookups so the "Recent student questions" feed can show real
+  // student names + which professor's class the question came from.
+  const profileNameById = new Map<string, { full_name: string; student_id: string }>();
+  for (const p of profiles as Array<{ id: string; full_name?: string; student_id?: string }>) {
+    profileNameById.set(p.id, {
+      full_name: p.full_name ?? "(unknown)",
+      student_id: p.student_id ?? "—",
+    });
+  }
+  // Pull session→prof+course for any session referenced by recent messages.
+  const sessionContextById = new Map<
+    string,
+    { professor_name: string | null; course_name: string | null }
+  >();
+  const referencedSessionIds = Array.from(
+    new Set(recentMessages.map((m) => m.session_id).filter(Boolean) as string[])
+  );
+  if (referencedSessionIds.length > 0) {
+    const { data: ctx } = await supabase
+      .from("chat_sessions")
+      .select("id, professor_name, course_name")
+      .in("id", referencedSessionIds);
+    for (const row of ctx ?? []) {
+      sessionContextById.set(row.id as string, {
+        professor_name: (row.professor_name as string | null) ?? null,
+        course_name: (row.course_name as string | null) ?? null,
+      });
+    }
+  }
   const feedback = (feedbackRes.data ?? []) as Array<{
     metadata: { text?: string; path?: string | null } | null;
     created_at: string;
@@ -282,6 +317,74 @@ export default async function AdminPage() {
               uploads.
             </p>
             <BreakdownList counts={fileTypeCounts} total={totalFiles} />
+          </section>
+
+          <section className="rounded-2xl border border-border bg-surface p-6 lg:col-span-3">
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="font-serif text-lg font-semibold">
+                Recent student questions
+              </h2>
+              <span className="text-[11px] uppercase tracking-wider text-ink-400">
+                latest 30
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-ink-400">
+              The most recent things students actually asked the bot — with
+              who asked, the class, and the professor.
+            </p>
+            {recentMessages.length === 0 ? (
+              <p className="mt-4 text-sm text-ink-300">
+                No student questions yet.
+              </p>
+            ) : (
+              <ul className="mt-4 flex flex-col gap-3">
+                {recentMessages.slice(0, 30).map((m, i) => {
+                  const profile = m.user_id
+                    ? profileNameById.get(m.user_id)
+                    : null;
+                  const ctx = m.session_id
+                    ? sessionContextById.get(m.session_id)
+                    : null;
+                  const when = new Date(m.created_at).toLocaleString(
+                    undefined,
+                    {
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    }
+                  );
+                  return (
+                    <li
+                      key={i}
+                      className="rounded-xl border border-border/60 bg-surface-elevated px-4 py-3 text-sm"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2 text-[11px] uppercase tracking-wider">
+                        <span className="font-semibold text-foreground">
+                          {profile?.full_name ?? "(unknown student)"}
+                          <span className="ml-2 font-normal text-ink-400">
+                            ID {profile?.student_id ?? "—"}
+                          </span>
+                        </span>
+                        <span className="text-ink-400">{when}</span>
+                      </div>
+                      {(ctx?.course_name || ctx?.professor_name) && (
+                        <div className="mt-0.5 text-[11px] text-gold-300">
+                          {ctx?.course_name ?? ""}
+                          {ctx?.course_name && ctx?.professor_name ? " · " : ""}
+                          {ctx?.professor_name
+                            ? `Prof. ${ctx.professor_name}`
+                            : ""}
+                        </div>
+                      )}
+                      <p className="mt-2 whitespace-pre-wrap break-words text-foreground">
+                        {m.content}
+                      </p>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </section>
 
           <section className="rounded-2xl border border-border bg-surface p-6 lg:col-span-3">

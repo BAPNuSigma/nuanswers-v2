@@ -91,20 +91,99 @@ export default async function ProfessorsPage({ searchParams }: Props) {
     .map(([date, count]) => ({ date, count }));
   const maxDaily = Math.max(1, ...dailySeries.map((d) => d.count));
 
-  // Top topics — extract from analytics_events.metadata.text or fall back to
-  // first user messages for prof's sessions
+  // Pull recent USER messages + the profiles of every student in this prof's
+  // sessions, so we can build a per-student "what are they asking" view.
+  // Topic word cloud is computed from the same message pool.
   const sessionIds = sessionsList.map((s) => s.id);
-  const recentMessages: Array<{ session_id: string; content: string }> = [];
+  const recentMessages: Array<{
+    session_id: string;
+    user_id: string | null;
+    content: string;
+    created_at: string;
+  }> = [];
   if (sessionIds.length > 0) {
     const { data: msgs } = await supabase
       .from("messages")
-      .select("session_id, content")
+      .select("session_id, user_id, content, created_at")
       .in("session_id", sessionIds)
       .eq("role", "user")
       .order("created_at", { ascending: false })
-      .limit(200);
+      .limit(500);
     if (msgs) recentMessages.push(...msgs);
   }
+
+  // Profile lookup: full_name + student_id for every student in these sessions.
+  const userIdSet = new Set(sessionsList.map((s) => s.user_id).filter(Boolean) as string[]);
+  const userIds = Array.from(userIdSet);
+  const profilesByUserId = new Map<
+    string,
+    { full_name: string; student_id: string }
+  >();
+  if (userIds.length > 0) {
+    const { data: profs } = await supabase
+      .from("profiles")
+      .select("id, full_name, student_id")
+      .in("id", userIds);
+    for (const p of profs ?? []) {
+      profilesByUserId.set(p.id as string, {
+        full_name: p.full_name as string,
+        student_id: p.student_id as string,
+      });
+    }
+  }
+
+  // Build per-student summaries: counts + last 3 questions + last active.
+  type StudentSummary = {
+    userId: string;
+    fullName: string;
+    studentId: string;
+    sessions: number;
+    messages: number;
+    lastActive: string | null;
+    courses: Set<string>;
+    recentQuestions: Array<{ content: string; created_at: string }>;
+  };
+  const studentMap = new Map<string, StudentSummary>();
+  for (const s of sessionsList) {
+    if (!s.user_id) continue;
+    let entry = studentMap.get(s.user_id);
+    if (!entry) {
+      const profile = profilesByUserId.get(s.user_id);
+      entry = {
+        userId: s.user_id,
+        fullName: profile?.full_name ?? "(unknown student)",
+        studentId: profile?.student_id ?? "—",
+        sessions: 0,
+        messages: 0,
+        lastActive: null,
+        courses: new Set(),
+        recentQuestions: [],
+      };
+      studentMap.set(s.user_id, entry);
+    }
+    entry.sessions += 1;
+    entry.messages += s.message_count ?? 0;
+    if (s.course_name) entry.courses.add(s.course_name);
+    if (!entry.lastActive || s.started_at > entry.lastActive) {
+      entry.lastActive = s.started_at;
+    }
+  }
+  // Attach last 3 questions per student (messages are already sorted desc).
+  for (const m of recentMessages) {
+    if (!m.user_id) continue;
+    const entry = studentMap.get(m.user_id);
+    if (!entry) continue;
+    if (entry.recentQuestions.length >= 3) continue;
+    entry.recentQuestions.push({
+      content: m.content,
+      created_at: m.created_at,
+    });
+  }
+  const studentList = Array.from(studentMap.values()).sort((a, b) => {
+    if (b.messages !== a.messages) return b.messages - a.messages;
+    return a.fullName.localeCompare(b.fullName);
+  });
+
   const topicWordCounts = new Map<string, number>();
   for (const m of recentMessages) {
     for (const word of extractTopicWords(m.content)) {
@@ -224,6 +303,87 @@ export default async function ProfessorsPage({ searchParams }: Props) {
                       </li>
                     ))}
                 </ul>
+              </section>
+
+              <section className="rounded-2xl border border-border bg-surface p-6 lg:col-span-3">
+                <div className="flex items-start justify-between gap-3">
+                  <h2 className="font-serif text-lg font-semibold">
+                    Your students
+                  </h2>
+                  <span className="text-[11px] uppercase tracking-wider text-ink-400">
+                    {studentList.length}{" "}
+                    {studentList.length === 1 ? "student" : "students"}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-ink-400">
+                  Each student who has used the bot in a class tagged with you,
+                  plus the last few questions they actually asked.
+                </p>
+                {studentList.length === 0 ? (
+                  <p className="mt-4 text-sm text-ink-300">
+                    No students yet.
+                  </p>
+                ) : (
+                  <ul className="mt-4 flex flex-col gap-3">
+                    {studentList.map((s) => {
+                      const lastActiveLabel = s.lastActive
+                        ? new Date(s.lastActive).toLocaleString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })
+                        : "never";
+                      const courseLine = Array.from(s.courses).join(" · ");
+                      return (
+                        <li
+                          key={s.userId}
+                          className="rounded-xl border border-border/60 bg-surface-elevated p-4"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="font-serif text-base font-semibold text-foreground">
+                                {s.fullName}
+                              </div>
+                              <div className="mt-0.5 text-[11px] uppercase tracking-wider text-ink-400">
+                                ID {s.studentId}
+                                {courseLine ? ` · ${courseLine}` : ""}
+                              </div>
+                            </div>
+                            <div className="flex flex-none items-center gap-3 text-[11px] uppercase tracking-wider text-gold-300">
+                              <span>
+                                {s.sessions}{" "}
+                                {s.sessions === 1 ? "session" : "sessions"}
+                              </span>
+                              <span>
+                                {s.messages}{" "}
+                                {s.messages === 1 ? "msg" : "msgs"}
+                              </span>
+                              <span className="text-ink-400">
+                                {lastActiveLabel}
+                              </span>
+                            </div>
+                          </div>
+                          {s.recentQuestions.length > 0 && (
+                            <ul className="mt-3 flex flex-col gap-2 border-t border-border/50 pt-3">
+                              {s.recentQuestions.map((q, i) => (
+                                <li
+                                  key={i}
+                                  className="text-xs leading-relaxed text-ink-200"
+                                >
+                                  <span className="text-ink-400">›</span>{" "}
+                                  <span className="whitespace-pre-wrap break-words">
+                                    {q.content}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </section>
 
               <section className="rounded-2xl border border-border bg-surface p-6 lg:col-span-3">
