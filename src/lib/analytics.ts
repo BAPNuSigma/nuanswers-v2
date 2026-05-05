@@ -6,6 +6,7 @@ export type AnalyticsEventType =
   | "chat_response_received"
   | "file_uploaded"
   | "feedback_submitted"
+  | "user_feedback_text"
   | "login"
   | "signup"
   | "tutoring_hours_blocked"

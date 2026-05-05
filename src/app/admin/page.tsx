@@ -34,6 +34,8 @@ export default async function AdminPage() {
     professorsRes,
     eventsRes,
     recentMessagesRes,
+    feedbackRes,
+    thumbsRes,
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -63,6 +65,16 @@ export default async function AdminPage() {
       .eq("role", "user")
       .order("created_at", { ascending: false })
       .limit(500),
+    supabase
+      .from("analytics_events")
+      .select("metadata, created_at, user_id")
+      .eq("event_type", "user_feedback_text")
+      .order("created_at", { ascending: false })
+      .limit(20),
+    supabase
+      .from("analytics_events")
+      .select("metadata")
+      .eq("event_type", "feedback_submitted"),
   ]);
 
   const totalStudents = profilesRes.count ?? 0;
@@ -76,6 +88,21 @@ export default async function AdminPage() {
   const professorRows = professorsRes.data ?? [];
   const events = eventsRes.data ?? [];
   const recentMessages = recentMessagesRes.data ?? [];
+  const feedback = (feedbackRes.data ?? []) as Array<{
+    metadata: { text?: string; path?: string | null } | null;
+    created_at: string;
+    user_id: string | null;
+  }>;
+  const thumbs = (thumbsRes.data ?? []) as Array<{
+    metadata: { sentiment?: "up" | "down" } | null;
+  }>;
+  const thumbsUp = thumbs.filter((t) => t.metadata?.sentiment === "up").length;
+  const thumbsDown = thumbs.filter(
+    (t) => t.metadata?.sentiment === "down"
+  ).length;
+  const thumbsTotal = thumbsUp + thumbsDown;
+  const helpfulPct =
+    thumbsTotal > 0 ? Math.round((thumbsUp / thumbsTotal) * 100) : null;
 
   // Active students = anyone who started a session in the last 30 days.
   const activeUserIds = new Set<string>();
@@ -187,7 +214,11 @@ export default async function AdminPage() {
           <Stat
             label="Messages exchanged"
             value={totalMessages}
-            sublabel="student + tutor"
+            sublabel={
+              helpfulPct !== null
+                ? `${helpfulPct}% rated helpful`
+                : "student + tutor"
+            }
           />
           <Stat
             label="Files indexed"
@@ -250,6 +281,51 @@ export default async function AdminPage() {
               uploads.
             </p>
             <BreakdownList counts={fileTypeCounts} total={totalFiles} />
+          </section>
+
+          <section className="rounded-2xl border border-border bg-surface p-6 lg:col-span-3">
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="font-serif text-lg font-semibold">
+                Recent feedback from students
+              </h2>
+              <span className="text-[11px] uppercase tracking-wider text-ink-400">
+                {thumbsUp}👍 · {thumbsDown}👎 on responses
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-ink-400">
+              Bug reports + suggestions students submitted via the &ldquo;Tell
+              us&rdquo; link in the chat footer.
+            </p>
+            {feedback.length === 0 ? (
+              <p className="mt-4 text-sm text-ink-300">
+                No feedback yet. Students will leave notes here as they use the
+                bot.
+              </p>
+            ) : (
+              <ul className="mt-4 flex flex-col gap-3">
+                {feedback.map((f, i) => {
+                  const date = new Date(f.created_at);
+                  const text =
+                    typeof f.metadata?.text === "string"
+                      ? f.metadata.text
+                      : "(no text)";
+                  return (
+                    <li
+                      key={i}
+                      className="rounded-xl border border-border/60 bg-surface-elevated px-4 py-3 text-sm"
+                    >
+                      <p className="whitespace-pre-wrap break-words text-foreground">
+                        {text}
+                      </p>
+                      <p className="mt-2 text-[11px] uppercase tracking-wider text-ink-400">
+                        {date.toLocaleString()}
+                        {f.metadata?.path ? ` · from ${f.metadata.path}` : ""}
+                      </p>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </section>
 
           <section className="rounded-2xl border border-border bg-surface p-6 lg:col-span-3">
