@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient, fetchEmailsByUserId } from "@/lib/supabase/admin";
 import { Wordmark } from "@/components/Wordmark";
 import { isStaffSignedIn } from "@/lib/staff-auth";
 import { StaffSignOutButton } from "@/components/StaffSignOutButton";
@@ -132,11 +132,17 @@ export default async function ProfessorsPage({ searchParams }: Props) {
     }
   }
 
+  // Email lookup from auth.users — students who didn't fill in full_name
+  // still have an email (it's their login), so this is the most reliable
+  // way for Carlo to recognize who's actually using the bot.
+  const emailsByUserId = await fetchEmailsByUserId(supabase, userIds);
+
   // Build per-student summaries: counts + last 3 questions + last active.
   type StudentSummary = {
     userId: string;
-    fullName: string;
-    studentId: string;
+    email: string | null;
+    fullName: string | null;
+    studentId: string | null;
     sessions: number;
     messages: number;
     lastActive: string | null;
@@ -151,8 +157,9 @@ export default async function ProfessorsPage({ searchParams }: Props) {
       const profile = profilesByUserId.get(s.user_id);
       entry = {
         userId: s.user_id,
-        fullName: profile?.full_name ?? "(unknown student)",
-        studentId: profile?.student_id ?? "—",
+        email: emailsByUserId.get(s.user_id) ?? null,
+        fullName: profile?.full_name ?? null,
+        studentId: profile?.student_id ?? null,
         sessions: 0,
         messages: 0,
         lastActive: null,
@@ -181,7 +188,9 @@ export default async function ProfessorsPage({ searchParams }: Props) {
   }
   const studentList = Array.from(studentMap.values()).sort((a, b) => {
     if (b.messages !== a.messages) return b.messages - a.messages;
-    return a.fullName.localeCompare(b.fullName);
+    const aLabel = a.email ?? a.fullName ?? "";
+    const bLabel = b.email ?? b.fullName ?? "";
+    return aLabel.localeCompare(bLabel);
   });
 
   const topicWordCounts = new Map<string, number>();
@@ -342,11 +351,12 @@ export default async function ProfessorsPage({ searchParams }: Props) {
                         >
                           <div className="flex flex-wrap items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <div className="font-serif text-base font-semibold text-foreground">
-                                {s.fullName}
+                              <div className="break-all font-mono text-sm font-semibold text-foreground">
+                                {s.email ?? "(email unknown)"}
                               </div>
                               <div className="mt-0.5 text-[11px] uppercase tracking-wider text-ink-400">
-                                ID {s.studentId}
+                                {s.fullName ?? "name not set"}
+                                {s.studentId ? ` · ID ${s.studentId}` : ""}
                                 {courseLine ? ` · ${courseLine}` : ""}
                               </div>
                             </div>

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient, fetchEmailsByUserId } from "@/lib/supabase/admin";
 import { Wordmark } from "@/components/Wordmark";
 import { isStaffSignedIn } from "@/lib/staff-auth";
 import { StaffSignOutButton } from "@/components/StaffSignOutButton";
@@ -124,6 +124,14 @@ export default async function AdminPage() {
       });
     }
   }
+
+  // Email lookup for every student who appears in the recent-questions feed.
+  // Most students don't fill in full_name, so email is the most reliable
+  // way for officers to recognize who's actually using the bot.
+  const referencedUserIds = Array.from(
+    new Set(recentMessages.map((m) => m.user_id).filter(Boolean) as string[])
+  );
+  const emailsByUserId = await fetchEmailsByUserId(supabase, referencedUserIds);
   const feedback = (feedbackRes.data ?? []) as Array<{
     metadata: { text?: string; path?: string | null } | null;
     created_at: string;
@@ -342,6 +350,9 @@ export default async function AdminPage() {
                   const profile = m.user_id
                     ? profileNameById.get(m.user_id)
                     : null;
+                  const email = m.user_id
+                    ? emailsByUserId.get(m.user_id)
+                    : null;
                   const ctx = m.session_id
                     ? sessionContextById.get(m.session_id)
                     : null;
@@ -359,14 +370,19 @@ export default async function AdminPage() {
                       key={i}
                       className="rounded-xl border border-border/60 bg-surface-elevated px-4 py-3 text-sm"
                     >
-                      <div className="flex flex-wrap items-start justify-between gap-2 text-[11px] uppercase tracking-wider">
-                        <span className="font-semibold text-foreground">
-                          {profile?.full_name ?? "(unknown student)"}
-                          <span className="ml-2 font-normal text-ink-400">
-                            ID {profile?.student_id ?? "—"}
-                          </span>
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="break-all font-mono text-xs font-semibold text-foreground">
+                            {email ?? "(email unknown)"}
+                          </div>
+                          <div className="mt-0.5 text-[10px] uppercase tracking-wider text-ink-400">
+                            {profile?.full_name ?? "name not set"}
+                            {profile?.student_id ? ` · ID ${profile.student_id}` : ""}
+                          </div>
+                        </div>
+                        <span className="flex-none text-[11px] uppercase tracking-wider text-ink-400">
+                          {when}
                         </span>
-                        <span className="text-ink-400">{when}</span>
                       </div>
                       {(ctx?.course_name || ctx?.professor_name) && (
                         <div className="mt-0.5 text-[11px] text-gold-300">
