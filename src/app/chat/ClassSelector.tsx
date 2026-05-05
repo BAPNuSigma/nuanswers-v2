@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
-  COURSE_ID_HINT,
   isValidCourseId,
   type ClassContext,
 } from "@/lib/auth";
@@ -15,8 +14,16 @@ import {
   syntheticFacultyEmail,
   type Department,
 } from "@/lib/fdu-faculty";
+import {
+  COURSES_BY_DEPARTMENT,
+  COURSE_DEPARTMENT_ORDER,
+  formatCourseId,
+  getCourseByCode,
+  parseCourseId,
+} from "@/lib/fdu-courses";
 
 const OTHER_PROFESSOR_VALUE = "__other__";
+const OTHER_COURSE_VALUE = "__other__";
 const DEPARTMENT_ORDER: Department[] = [
   "Accounting",
   "Finance & Economics",
@@ -34,8 +41,22 @@ export function ClassSelector({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [courseId, setCourseId] = useState(initialClass?.course_id ?? "");
-  const [courseName, setCourseName] = useState(initialClass?.course_name ?? "");
+  // courseSelection is a catalog code ("ACCT3242") OR OTHER_COURSE_VALUE.
+  // courseSection is the section number ("01") — small text input.
+  const [courseSelection, setCourseSelection] = useState<string>(() =>
+    initialCourseSelection(initialClass)
+  );
+  const [courseSection, setCourseSection] = useState<string>(() =>
+    initialCourseSection(initialClass)
+  );
+  // Manual-entry fallback fields for "Other / not listed" courses.
+  const [otherCourseId, setOtherCourseId] = useState<string>(() =>
+    initialOtherCourseId(initialClass)
+  );
+  const [otherCourseName, setOtherCourseName] = useState<string>(() =>
+    initialOtherCourseName(initialClass)
+  );
+
   // facultySelection is either a faculty slug from the static list, or
   // OTHER_PROFESSOR_VALUE meaning "type a name for an adjunct/visitor".
   const [facultySelection, setFacultySelection] = useState<string>(() =>
@@ -43,6 +64,12 @@ export function ClassSelector({
   );
   const [otherProfName, setOtherProfName] = useState(() =>
     initialOtherProfName(initialClass)
+  );
+
+  const isOtherCourse = courseSelection === OTHER_COURSE_VALUE;
+  const selectedCourse = useMemo(
+    () => (isOtherCourse ? null : getCourseByCode(courseSelection)),
+    [courseSelection, isOtherCourse]
   );
 
   const isOther = facultySelection === OTHER_PROFESSOR_VALUE;
@@ -70,8 +97,10 @@ export function ClassSelector({
 
   function openDialog() {
     setError(null);
-    setCourseId(current?.course_id ?? "");
-    setCourseName(current?.course_name ?? "");
+    setCourseSelection(initialCourseSelection(current));
+    setCourseSection(initialCourseSection(current));
+    setOtherCourseId(initialOtherCourseId(current));
+    setOtherCourseName(initialOtherCourseName(current));
     setFacultySelection(initialFacultySelection(current));
     setOtherProfName(initialOtherProfName(current));
     setOpen(true);
@@ -81,14 +110,32 @@ export function ClassSelector({
     e.preventDefault();
     setError(null);
 
-    const id = courseId.trim().toUpperCase();
-    if (!isValidCourseId(id)) {
-      setError("Course ID must look like ACCT_3220_01.");
-      return;
-    }
-    if (!courseName.trim()) {
-      setError("Add the course name (e.g. 'Intermediate Financial Accounting II').");
-      return;
+    let resolvedCourseId: string;
+    let resolvedCourseName: string;
+    if (isOtherCourse) {
+      const id = otherCourseId.trim().toUpperCase();
+      if (!isValidCourseId(id)) {
+        setError("Course ID must look like ACCT_3242_01.");
+        return;
+      }
+      if (!otherCourseName.trim()) {
+        setError("Add the course name.");
+        return;
+      }
+      resolvedCourseId = id;
+      resolvedCourseName = otherCourseName.trim();
+    } else {
+      if (!selectedCourse) {
+        setError("Pick your course from the list.");
+        return;
+      }
+      const cleanedSection = courseSection.replace(/\D/g, "");
+      if (!cleanedSection) {
+        setError("Enter your section number (e.g. 01).");
+        return;
+      }
+      resolvedCourseId = formatCourseId(selectedCourse.code, cleanedSection);
+      resolvedCourseName = selectedCourse.title;
     }
 
     let resolvedProfName: string;
@@ -120,8 +167,8 @@ export function ClassSelector({
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        course_id: id,
-        course_name: courseName.trim(),
+        course_id: resolvedCourseId,
+        course_name: resolvedCourseName,
         professor_name: resolvedProfName,
         professor_email: resolvedProfEmail,
       }),
@@ -135,8 +182,8 @@ export function ClassSelector({
     }
 
     setCurrent({
-      course_id: id,
-      course_name: courseName.trim(),
+      course_id: resolvedCourseId,
+      course_name: resolvedCourseName,
       professor_name: resolvedProfName,
       professor_email: resolvedProfEmail,
     });
@@ -213,27 +260,83 @@ export function ClassSelector({
             </p>
 
             <form onSubmit={handleSave} className="flex flex-col gap-4">
-              <Field label="Course name">
-                <input
+              <Field label="Course">
+                <select
                   required
-                  value={courseName}
-                  onChange={(e) => setCourseName(e.target.value)}
-                  placeholder="Intermediate Financial Accounting II"
-                  className={inputClass}
-                />
+                  value={courseSelection}
+                  onChange={(e) => setCourseSelection(e.target.value)}
+                  className={`${inputClass} appearance-none`}
+                >
+                  <option value="" disabled>
+                    Pick your course…
+                  </option>
+                  {COURSE_DEPARTMENT_ORDER.map((dept) => {
+                    const list = COURSES_BY_DEPARTMENT[dept];
+                    if (!list || list.length === 0) return null;
+                    return (
+                      <optgroup key={dept} label={dept}>
+                        {list.map((c) => (
+                          <option key={c.code} value={c.code}>
+                            {c.code} — {c.title}
+                          </option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
+                  <option value={OTHER_COURSE_VALUE}>
+                    Other / not listed (type below)
+                  </option>
+                </select>
+                {selectedCourse && (
+                  <span className="text-[11px] text-ink-400">
+                    {selectedCourse.department} · {selectedCourse.credits} cr.
+                  </span>
+                )}
               </Field>
 
-              <Field label="Course ID" hint={COURSE_ID_HINT}>
-                <input
-                  required
-                  value={courseId}
-                  onChange={(e) =>
-                    setCourseId(e.target.value.toUpperCase().replace(/\s/g, ""))
-                  }
-                  placeholder="ACCT_3220_01"
-                  className={`${inputClass} font-mono uppercase tracking-wider`}
-                />
-              </Field>
+              {!isOtherCourse && (
+                <Field label="Section">
+                  <input
+                    required
+                    inputMode="numeric"
+                    pattern="\d{1,2}"
+                    maxLength={2}
+                    value={courseSection}
+                    onChange={(e) =>
+                      setCourseSection(e.target.value.replace(/\D/g, ""))
+                    }
+                    placeholder="01"
+                    className={`${inputClass} font-mono`}
+                  />
+                </Field>
+              )}
+
+              {isOtherCourse && (
+                <>
+                  <Field label="Course ID" hint="Format: DEPT_####_##">
+                    <input
+                      required
+                      value={otherCourseId}
+                      onChange={(e) =>
+                        setOtherCourseId(
+                          e.target.value.toUpperCase().replace(/\s/g, "")
+                        )
+                      }
+                      placeholder="ACCT_3242_01"
+                      className={`${inputClass} font-mono uppercase tracking-wider`}
+                    />
+                  </Field>
+                  <Field label="Course name">
+                    <input
+                      required
+                      value={otherCourseName}
+                      onChange={(e) => setOtherCourseName(e.target.value)}
+                      placeholder="Intermediate Financial Accounting II"
+                      className={inputClass}
+                    />
+                  </Field>
+                </>
+              )}
 
               <Field label="Professor">
                 <select
@@ -342,6 +445,34 @@ function initialOtherProfName(c: ClassContext | null): string {
   const slug = facultySlugFromEmail(c.professor_email);
   if (slug && getFacultyBySlug(slug)) return ""; // is a known faculty
   return c.professor_name ?? "";
+}
+
+function initialCourseSelection(c: ClassContext | null): string {
+  if (!c?.course_id) return "";
+  const parsed = parseCourseId(c.course_id);
+  if (parsed && getCourseByCode(parsed.code)) return parsed.code;
+  return OTHER_COURSE_VALUE;
+}
+
+function initialCourseSection(c: ClassContext | null): string {
+  if (!c?.course_id) return "";
+  const parsed = parseCourseId(c.course_id);
+  if (parsed && getCourseByCode(parsed.code)) return parsed.section;
+  return "";
+}
+
+function initialOtherCourseId(c: ClassContext | null): string {
+  if (!c?.course_id) return "";
+  const parsed = parseCourseId(c.course_id);
+  if (parsed && getCourseByCode(parsed.code)) return ""; // known catalog course
+  return c.course_id;
+}
+
+function initialOtherCourseName(c: ClassContext | null): string {
+  if (!c?.course_id) return "";
+  const parsed = parseCourseId(c.course_id);
+  if (parsed && getCourseByCode(parsed.code)) return ""; // known catalog course
+  return c.course_name ?? "";
 }
 
 const inputClass =

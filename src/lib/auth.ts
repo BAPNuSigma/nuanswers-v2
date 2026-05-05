@@ -58,14 +58,17 @@ export function isProfileComplete(profile: Pick<Profile, "grade" | "campus" | "m
   return Boolean(profile.grade && profile.campus && profile.major);
 }
 
-const COURSE_ID_RE = /^(ACCT|ECON|FIN|MIS|WMA)_\d{4}_\d{2}$/;
+// Accept any 3-5 letter Silberman dept prefix. The dropdown drives the value
+// for the most part; the loose regex is just a sanity-check for raw payloads
+// (legacy data, manual API calls, etc.).
+const COURSE_ID_RE = /^[A-Z]{3,5}_\d{4}_\d{2}$/;
 
 export function isValidCourseId(id: string): boolean {
-  return COURSE_ID_RE.test(id.trim());
+  return COURSE_ID_RE.test(id.trim().toUpperCase());
 }
 
 export const COURSE_ID_HINT =
-  "Format: DEPT_####_##  (e.g., ACCT_3220_01, FIN_3250_02). Allowed prefixes: ACCT, ECON, FIN, MIS, WMA.";
+  "Format: DEPT_####_##  (e.g., ACCT_3242_01, FIN_3250_02).";
 
 export type ClassContext = {
   course_id: string;
