@@ -7,6 +7,7 @@ import {
   type Profile,
 } from "@/lib/auth";
 import { isKnownProfessor } from "@/lib/professors";
+import { isAdminEmail } from "@/lib/admin";
 import { getTutoringHoursStatus } from "@/lib/tutoring-hours";
 import { TutoringHoursBlocker } from "./TutoringHoursBlocker";
 import type { DocumentRow } from "./MaterialsBar";
@@ -118,6 +119,7 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
       initialSessionId={activeSessionId}
       initialMessages={initialMessages}
       initialClass={profileClassContext(profile)}
+      isAdmin={isAdminEmail(user.email)}
     />
   );
 }

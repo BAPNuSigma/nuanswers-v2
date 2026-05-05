@@ -40,6 +40,7 @@ type ChatClientProps = {
   initialSessionId: string | null;
   initialMessages: StoredMessage[];
   initialClass: ClassContext | null;
+  isAdmin: boolean;
 };
 
 function storedToUIMessages(stored: StoredMessage[]): UIMessage[] {
@@ -62,6 +63,7 @@ export function ChatClient({
   initialSessionId,
   initialMessages,
   initialClass,
+  isAdmin,
 }: ChatClientProps) {
   const clientSessionId = useMemo(() => newSessionId(), []);
   const [bannerDismissed, setBannerDismissed] = useState(false);
@@ -184,6 +186,15 @@ export function ChatClient({
               )}
             />
             <ChatHistory activeSessionId={activeSessionId} />
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="rounded-full border border-gold-700/60 bg-gold-900/20 px-3 py-1.5 text-xs font-medium text-gold-200 transition hover:border-gold-500 hover:text-gold-100"
+                title="Open the BAP officer dashboard"
+              >
+                Admin
+              </Link>
+            )}
             <span className="hidden text-xs text-ink-300 md:inline">
               {fullName}
             </span>
