@@ -3,6 +3,20 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { professorLastName } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/client";
+
+const STORAGE_BUCKET = "course-materials";
+
+// 50 MB matches the storage bucket's file_size_limit. Anything larger is
+// rejected before we try to upload.
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+
+function safeStoragePath(userId: string, filename: string): string {
+  const sanitized = filename
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .replace(/_+/g, "_");
+  return `${userId}/${Date.now()}-${sanitized}`;
+}
 
 export type DocumentRow = {
   id: string;
@@ -96,17 +110,54 @@ export function MaterialsBar({
     if (fileInputRef.current) fileInputRef.current.value = "";
     setUploading(true);
 
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setError("You're signed out. Refresh the page and log back in.");
+      setUploading(false);
+      return;
+    }
+
     for (const file of filesToUpload) {
       try {
-        const form = new FormData();
-        form.append("file", file);
-        if (lastName) form.append("professor_last_name", lastName);
-        const res = await fetch("/api/documents/upload", {
+        if (file.size > MAX_UPLOAD_BYTES) {
+          throw new Error(
+            `File too large. Max ${MAX_UPLOAD_BYTES / 1024 / 1024} MB.`
+          );
+        }
+
+        // 1. Upload binary directly to Supabase Storage from the browser.
+        // This bypasses the Vercel 4.5 MB request body cap because Vercel
+        // is never in the path — the upload goes straight to Supabase.
+        const path = safeStoragePath(user.id, file.name);
+        const { error: storageError } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .upload(path, file, {
+            cacheControl: "3600",
+            upsert: false,
+            contentType: file.type || undefined,
+          });
+        if (storageError) {
+          throw new Error(storageError.message);
+        }
+
+        // 2. Tell the server to extract / chunk / embed from the storage path.
+        const res = await fetch("/api/documents/process", {
           method: "POST",
-          body: form,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            storage_path: path,
+            filename: file.name,
+            professor_last_name: lastName,
+          }),
         });
         if (!res.ok) {
           const errJson = await res.json().catch(() => ({}));
+          // If processing failed, clean up the orphaned Storage file so we
+          // don't accumulate junk under the user's quota.
+          await supabase.storage.from(STORAGE_BUCKET).remove([path]);
           throw new Error(errJson.error ?? `Upload failed (${res.status})`);
         }
       } catch (err) {
