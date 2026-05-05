@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
+import { cookies } from "next/headers";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -31,14 +32,24 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export const THEME_COOKIE_NAME = "nuanswers-theme";
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Read the user's preferred theme cookie server-side so the very first
+  // paint already has the right colors — no flash, no flicker. Default
+  // is dark to match the BAP brand.
+  const c = await cookies();
+  const theme =
+    c.get(THEME_COOKIE_NAME)?.value === "light" ? "light" : "dark";
+
   return (
     <html
       lang="en"
+      data-theme={theme}
       className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">

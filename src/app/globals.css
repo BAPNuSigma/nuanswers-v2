@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/*
+ * Theme tokens.
+ *
+ * Dark mode is the default (BAP crimson/black/gold branding leans dark).
+ * Light mode flips background/surface/border + the entire ink-* greyscale
+ * ramp; brand colors (crimson, gold) stay identical so the chapter
+ * identity reads the same in both themes.
+ *
+ * Toggle by setting `data-theme="light"` on <html> (server-side from a
+ * cookie in app/layout.tsx, client-side from ThemeToggle).
+ */
 @theme {
   --color-crimson-50: #fdf2f2;
   --color-crimson-100: #fbe0e0;
@@ -23,6 +34,7 @@
   --color-gold-800: #57441b;
   --color-gold-900: #322610;
 
+  /* Dark-mode (default) ink ramp + surface tokens. */
   --color-ink-50: #f5f5f5;
   --color-ink-100: #e5e5e5;
   --color-ink-200: #c7c7c7;
@@ -45,6 +57,30 @@
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
+/*
+ * Light-mode overrides. Flips greys top-to-bottom so utilities like
+ * `text-ink-200` (semi-muted) and `bg-ink-600` (badge background) stay
+ * legible against a white surface. Brand colors are NOT redefined.
+ */
+[data-theme="light"] {
+  --color-ink-50: #0f0f0f;
+  --color-ink-100: #1a1a1a;
+  --color-ink-200: #2d2d2d;
+  --color-ink-300: #404040;
+  --color-ink-400: #666666;
+  --color-ink-500: #9a9a9a;
+  --color-ink-600: #c7c7c7;
+  --color-ink-700: #e5e5e5;
+  --color-ink-800: #f0f0f0;
+  --color-ink-900: #ffffff;
+
+  --color-background: #fafafa;
+  --color-foreground: #0f0f0f;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #f5f5f5;
+  --color-border: #e5e5e5;
+}
+
 html, body {
   background: var(--color-background);
   color: var(--color-foreground);
@@ -55,15 +91,20 @@ html, body {
 
 ::selection {
   background: var(--color-gold-500);
-  color: var(--color-ink-900);
+  color: #0f0f0f;
 }
 
 .font-serif {
   font-family: var(--font-serif);
 }
 
+/* Subtle gold dot grid on dark, slightly stronger on light so it's visible. */
 .bg-grain {
   background-image:
     radial-gradient(circle at 1px 1px, rgba(201, 168, 76, 0.04) 1px, transparent 0);
   background-size: 24px 24px;
+}
+[data-theme="light"] .bg-grain {
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(139, 0, 0, 0.06) 1px, transparent 0);
 }

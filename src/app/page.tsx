@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Wordmark } from "@/components/Wordmark";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { createClient } from "@/lib/supabase/server";
 
 export const revalidate = 300; // refresh stats every 5 min
@@ -12,10 +13,11 @@ export default async function Home() {
       <header className="border-b border-border/60">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5 sm:px-8">
           <Wordmark size="md" />
-          <nav className="flex items-center gap-6 text-sm text-ink-300">
+          <nav className="flex items-center gap-3 text-sm text-ink-300 sm:gap-6">
             <span className="hidden sm:inline">
               Beta Alpha Psi · Nu Sigma Chapter
             </span>
+            <ThemeToggle />
             <Link
               href="/chat"
               className="rounded-full bg-crimson-700 px-4 py-2 font-medium text-white transition hover:bg-crimson-600"

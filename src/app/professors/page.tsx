@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { Wordmark } from "@/components/Wordmark";
 import { isStaffSignedIn } from "@/lib/staff-auth";
 import { StaffSignOutButton } from "@/components/StaffSignOutButton";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   SILBERMAN_FACULTY,
   facultySlugFromEmail,
@@ -139,6 +140,7 @@ export default async function ProfessorsPage({ searchParams }: Props) {
             >
               Officer view
             </Link>
+            <ThemeToggle />
             <StaffSignOutButton />
           </div>
         </div>
@@ -461,6 +463,7 @@ async function ProfessorDirectory({
             >
               Tutor view
             </Link>
+            <ThemeToggle />
             <StaffSignOutButton />
           </div>
         </div>

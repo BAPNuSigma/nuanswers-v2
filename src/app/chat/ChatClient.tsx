@@ -17,6 +17,7 @@ import { MaterialsBar, type DocumentRow } from "./MaterialsBar";
 import { ChatHistory } from "./ChatHistory";
 import { ClassSelector } from "./ClassSelector";
 import { professorLastName, type ClassContext } from "@/lib/auth";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 // Starter questions students can tap on the welcome screen, grouped by topic
 // so the screen feels like a real "what can this thing do?" menu instead of
@@ -222,6 +223,7 @@ export function ChatClient({
               )}
             />
             <ChatHistory activeSessionId={activeSessionId} />
+            <ThemeToggle />
             <span className="hidden text-xs text-ink-300 md:inline">
               {fullName}
             </span>

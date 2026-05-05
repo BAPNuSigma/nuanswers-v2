@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { Wordmark } from "@/components/Wordmark";
 import { isStaffSignedIn } from "@/lib/staff-auth";
 import { StaffSignOutButton } from "@/components/StaffSignOutButton";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 // Chapter rollup. Today every NuAnswers user is on the BAP Nu Sigma (FDU)
 // chapter. As more chapters join we'll add a `chapter` column to profiles
@@ -180,6 +181,7 @@ export default async function AdminPage() {
             >
               Tutor view
             </Link>
+            <ThemeToggle />
             <StaffSignOutButton />
           </div>
         </div>

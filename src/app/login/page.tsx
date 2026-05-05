@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { isFduEmail, FDU_EMAIL_HINT } from "@/lib/auth";
 import { Wordmark } from "@/components/Wordmark";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { logEvent } from "@/lib/analytics";
 
 type Step = "email" | "code";
@@ -96,10 +97,11 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background bg-grain">
       <header className="border-b border-border/60">
-        <div className="mx-auto w-full max-w-6xl px-6 py-5 sm:px-8">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5 sm:px-8">
           <Link href="/">
             <Wordmark size="md" />
           </Link>
+          <ThemeToggle />
         </div>
       </header>
 
