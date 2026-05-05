@@ -336,9 +336,11 @@ function BreakdownList({
         const pct = Math.round((count / total) * 100);
         return (
           <li key={key} className="flex flex-col gap-1">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-medium text-foreground">{key}</span>
-              <span className="text-ink-300">
+            <div className="flex items-start justify-between gap-2 text-xs">
+              <span className="line-clamp-2 break-words font-medium text-foreground">
+                {key}
+              </span>
+              <span className="flex-none text-ink-300">
                 {count} · {pct}%
               </span>
             </div>

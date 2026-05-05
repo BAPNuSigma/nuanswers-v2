@@ -279,6 +279,13 @@ export function MaterialsBar({
                 </p>
               )}
 
+              {uploading && (
+                <p className="mb-3 inline-flex items-center gap-2 text-xs text-gold-300">
+                  <Spinner /> Uploading and indexing — this can take 10-30
+                  seconds for large files.
+                </p>
+              )}
+
               {documents.length > 0 && (
                 <div className="flex flex-col gap-3">
                   {groupKeys.map((key) => (
@@ -293,9 +300,13 @@ export function MaterialsBar({
               )}
 
               {error && (
-                <p className="mt-3 rounded-lg border border-crimson-700/60 bg-crimson-900/20 px-3 py-2 text-xs text-crimson-200">
-                  {error}
-                </p>
+                <div className="mt-3 rounded-lg border border-crimson-700/60 bg-crimson-900/20 px-3 py-2 text-xs text-crimson-200">
+                  <p>{error}</p>
+                  <p className="mt-1 text-[11px] text-crimson-300/80">
+                    Try a smaller file, a different format, or remove this and
+                    re-upload.
+                  </p>
+                </div>
               )}
             </div>
           </div>

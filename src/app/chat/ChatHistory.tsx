@@ -119,12 +119,12 @@ export function ChatHistory({
                     <button
                       type="button"
                       onClick={() => handleOpenSession(s.id)}
-                      className="flex flex-1 flex-col gap-0.5 text-left"
+                      className="flex min-w-0 flex-1 flex-col gap-0.5 text-left"
                     >
-                      <span className="line-clamp-1 text-ink-100">
+                      <span className="line-clamp-2 break-words text-ink-100">
                         {label}
                       </span>
-                      <span className="text-[10px] uppercase tracking-wider text-ink-400">
+                      <span className="line-clamp-1 text-[10px] uppercase tracking-wider text-ink-400">
                         {dateStr} · {s.message_count} msg
                         {s.course_name ? ` · ${s.course_name}` : ""}
                       </span>

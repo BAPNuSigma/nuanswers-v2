@@ -138,9 +138,17 @@ export function ProfileForm({ profile }: { profile: Profile }) {
       <button
         type="submit"
         disabled={status === "saving"}
-        className="mt-2 inline-flex h-12 items-center justify-center rounded-xl bg-crimson-700 font-semibold text-white transition hover:bg-crimson-600 disabled:cursor-not-allowed disabled:opacity-40"
+        className={`mt-2 inline-flex h-12 items-center justify-center rounded-xl font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+          status === "saved"
+            ? "bg-gold-600 text-ink-900"
+            : "bg-crimson-700 text-white hover:bg-crimson-600"
+        }`}
       >
-        {status === "saving" ? "Saving…" : status === "saved" ? "Saved ✓" : "Save"}
+        {status === "saving"
+          ? "Saving…"
+          : status === "saved"
+            ? "Saved ✓"
+            : "Save"}
       </button>
     </form>
   );

@@ -131,7 +131,7 @@ export function ClassSelector({
       <button
         type="button"
         onClick={openDialog}
-        className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition ${
+        className={`inline-flex h-8 max-w-[180px] items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition sm:max-w-[240px] ${
           current
             ? "border-gold-700/40 bg-gold-900/15 text-gold-200 hover:border-gold-500"
             : "border-crimson-700/60 bg-crimson-900/20 text-crimson-200 hover:border-crimson-500"
@@ -143,7 +143,7 @@ export function ClassSelector({
         }
       >
         <span aria-hidden>🎓</span>
-        <span className="max-w-[140px] truncate">
+        <span className="truncate">
           {current
             ? `${current.course_id} · ${shortName(current.professor_name)}`
             : "Pick your class"}

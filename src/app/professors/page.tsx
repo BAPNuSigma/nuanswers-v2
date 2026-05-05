@@ -173,17 +173,17 @@ export default async function ProfessorsPage() {
                     .map(([courseId, info]) => (
                       <li
                         key={courseId}
-                        className="flex items-center justify-between gap-3 border-b border-border/50 pb-2 last:border-0 last:pb-0"
+                        className="flex items-start justify-between gap-3 border-b border-border/50 pb-2 last:border-0 last:pb-0"
                       >
-                        <div className="flex flex-col">
-                          <span className="font-medium text-foreground">
+                        <div className="flex min-w-0 flex-col">
+                          <span className="line-clamp-2 break-words font-medium text-foreground">
                             {info.name}
                           </span>
                           <span className="text-[11px] uppercase tracking-wider text-ink-400">
                             {courseId}
                           </span>
                         </div>
-                        <span className="text-xs font-medium text-gold-300">
+                        <span className="flex-none text-xs font-medium text-gold-300">
                           {info.sessions}{" "}
                           {info.sessions === 1 ? "session" : "sessions"}
                         </span>
@@ -294,7 +294,10 @@ function EmptyState({ email }: { email: string }) {
         their class settings.
       </p>
       <p className="mx-auto mt-3 max-w-md text-xs text-ink-400">
-        Share <span className="font-mono">https://nuanswers-v2.vercel.app</span>{" "}
+        Share{" "}
+        <span className="break-all font-mono">
+          https://nuanswers-v2.vercel.app
+        </span>{" "}
         with your class — students sign in with their FDU email, set their
         course + professor, and start chatting.
       </p>
