@@ -220,7 +220,12 @@ export function ChatClient({
           {hasMessages && (
             <ul className="flex flex-col gap-6">
               {messages.map((m) => (
-                <MessageBubble key={m.id} message={m as UIMsg} />
+                <MessageBubble
+                  key={m.id}
+                  message={m as UIMsg}
+                  userId={userId}
+                  clientSessionId={clientSessionId}
+                />
               ))}
               {isResponding &&
                 messages[messages.length - 1]?.role === "user" && (
@@ -339,12 +344,37 @@ function Welcome({ onPick }: { onPick: (t: string) => void }) {
   );
 }
 
-function MessageBubble({ message }: { message: UIMsg }) {
+function MessageBubble({
+  message,
+  userId,
+  clientSessionId,
+}: {
+  message: UIMsg;
+  userId: string;
+  clientSessionId: string;
+}) {
   const isUser = message.role === "user";
   const text = (message.parts ?? [])
     .filter((p) => p.type === "text")
     .map((p) => p.text)
     .join("");
+
+  const [vote, setVote] = useState<"up" | "down" | null>(null);
+
+  function castVote(sentiment: "up" | "down") {
+    if (vote) return; // one vote per message
+    setVote(sentiment);
+    logEvent({
+      event_type: "feedback_submitted",
+      user_id: userId,
+      session_id: clientSessionId,
+      metadata: {
+        sentiment,
+        message_id: message.id,
+        message_length: text.length,
+      },
+    });
+  }
 
   return (
     <li
@@ -355,14 +385,48 @@ function MessageBubble({ message }: { message: UIMsg }) {
           N
         </div>
       )}
-      <div
-        className={
-          isUser
-            ? "max-w-[85%] rounded-2xl rounded-br-sm bg-gold-600/90 px-4 py-3 text-ink-900"
-            : "max-w-[85%] rounded-2xl rounded-bl-sm border border-border bg-surface px-4 py-3 text-foreground"
-        }
-      >
-        <p className="whitespace-pre-wrap text-base leading-relaxed">{text}</p>
+      <div className="flex max-w-[85%] flex-col gap-1.5">
+        <div
+          className={
+            isUser
+              ? "rounded-2xl rounded-br-sm bg-gold-600/90 px-4 py-3 text-ink-900"
+              : "rounded-2xl rounded-bl-sm border border-border bg-surface px-4 py-3 text-foreground"
+          }
+        >
+          <p className="whitespace-pre-wrap text-base leading-relaxed">{text}</p>
+        </div>
+        {!isUser && text.trim().length > 0 && (
+          <div className="flex items-center gap-2 pl-1 text-[11px] text-ink-400">
+            {vote ? (
+              <span className="text-ink-300">
+                Thanks for the feedback
+                {vote === "down" ? " — we'll use it to improve." : "!"}
+              </span>
+            ) : (
+              <>
+                <span>Was this helpful?</span>
+                <button
+                  type="button"
+                  onClick={() => castVote("up")}
+                  className="rounded-full px-1.5 py-0.5 transition hover:bg-surface-elevated hover:text-gold-300"
+                  aria-label="Helpful"
+                  title="Helpful"
+                >
+                  👍
+                </button>
+                <button
+                  type="button"
+                  onClick={() => castVote("down")}
+                  className="rounded-full px-1.5 py-0.5 transition hover:bg-surface-elevated hover:text-crimson-300"
+                  aria-label="Not helpful"
+                  title="Not helpful"
+                >
+                  👎
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </li>
   );
