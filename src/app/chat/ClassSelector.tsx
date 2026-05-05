@@ -1,14 +1,27 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   COURSE_ID_HINT,
-  isFduEmail,
   isValidCourseId,
   type ClassContext,
 } from "@/lib/auth";
+import {
+  FACULTY_BY_DEPARTMENT,
+  facultySlugFromEmail,
+  getFacultyBySlug,
+  syntheticFacultyEmail,
+  type Department,
+} from "@/lib/fdu-faculty";
+
+const OTHER_PROFESSOR_VALUE = "__other__";
+const DEPARTMENT_ORDER: Department[] = [
+  "Accounting",
+  "Finance & Economics",
+  "Management & Marketing",
+];
 
 export function ClassSelector({
   initialClass,
@@ -23,11 +36,19 @@ export function ClassSelector({
 
   const [courseId, setCourseId] = useState(initialClass?.course_id ?? "");
   const [courseName, setCourseName] = useState(initialClass?.course_name ?? "");
-  const [professorName, setProfessorName] = useState(
-    initialClass?.professor_name ?? ""
+  // facultySelection is either a faculty slug from the static list, or
+  // OTHER_PROFESSOR_VALUE meaning "type a name for an adjunct/visitor".
+  const [facultySelection, setFacultySelection] = useState<string>(() =>
+    initialFacultySelection(initialClass)
   );
-  const [professorEmail, setProfessorEmail] = useState(
-    initialClass?.professor_email ?? ""
+  const [otherProfName, setOtherProfName] = useState(() =>
+    initialOtherProfName(initialClass)
+  );
+
+  const isOther = facultySelection === OTHER_PROFESSOR_VALUE;
+  const selectedFaculty = useMemo(
+    () => (isOther ? null : getFacultyBySlug(facultySelection)),
+    [facultySelection, isOther]
   );
 
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -51,8 +72,8 @@ export function ClassSelector({
     setError(null);
     setCourseId(current?.course_id ?? "");
     setCourseName(current?.course_name ?? "");
-    setProfessorName(current?.professor_name ?? "");
-    setProfessorEmail(current?.professor_email ?? "");
+    setFacultySelection(initialFacultySelection(current));
+    setOtherProfName(initialOtherProfName(current));
     setOpen(true);
   }
 
@@ -69,14 +90,29 @@ export function ClassSelector({
       setError("Add the course name (e.g. 'Intermediate Financial Accounting II').");
       return;
     }
-    if (!professorName.trim()) {
-      setError("Add your professor's name.");
-      return;
-    }
-    const email = professorEmail.trim().toLowerCase();
-    if (!isFduEmail(email)) {
-      setError("Professor email must end with @fdu.edu or @student.fdu.edu.");
-      return;
+
+    let resolvedProfName: string;
+    let resolvedProfEmail: string;
+    if (isOther) {
+      const typed = otherProfName.trim();
+      if (!typed) {
+        setError("Enter your professor's name.");
+        return;
+      }
+      resolvedProfName = typed;
+      // Synthetic email keyed off the typed name so the directory still has
+      // a stable join key for adjuncts. Lowercased + spaces → dashes.
+      resolvedProfEmail = `${typed
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")}@silberman.fdu`;
+    } else {
+      if (!selectedFaculty) {
+        setError("Pick your professor from the list.");
+        return;
+      }
+      resolvedProfName = selectedFaculty.name;
+      resolvedProfEmail = syntheticFacultyEmail(selectedFaculty.slug);
     }
 
     setSubmitting(true);
@@ -86,8 +122,8 @@ export function ClassSelector({
       body: JSON.stringify({
         course_id: id,
         course_name: courseName.trim(),
-        professor_name: professorName.trim(),
-        professor_email: email,
+        professor_name: resolvedProfName,
+        professor_email: resolvedProfEmail,
       }),
     });
     setSubmitting(false);
@@ -101,8 +137,8 @@ export function ClassSelector({
     setCurrent({
       course_id: id,
       course_name: courseName.trim(),
-      professor_name: professorName.trim(),
-      professor_email: email,
+      professor_name: resolvedProfName,
+      professor_email: resolvedProfEmail,
     });
     setOpen(false);
     router.refresh();
@@ -199,26 +235,47 @@ export function ClassSelector({
                 />
               </Field>
 
-              <Field label="Professor name">
-                <input
+              <Field label="Professor">
+                <select
                   required
-                  value={professorName}
-                  onChange={(e) => setProfessorName(e.target.value)}
-                  placeholder="Dr. Jane Smith"
-                  className={inputClass}
-                />
+                  value={facultySelection}
+                  onChange={(e) => setFacultySelection(e.target.value)}
+                  className={`${inputClass} appearance-none`}
+                >
+                  <option value="" disabled>
+                    Pick your professor…
+                  </option>
+                  {DEPARTMENT_ORDER.map((dept) => (
+                    <optgroup key={dept} label={dept}>
+                      {FACULTY_BY_DEPARTMENT[dept].map((f) => (
+                        <option key={f.slug} value={f.slug}>
+                          {f.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                  <option value={OTHER_PROFESSOR_VALUE}>
+                    Other / not listed (type below)
+                  </option>
+                </select>
+                {selectedFaculty && (
+                  <span className="text-[11px] text-ink-400">
+                    {selectedFaculty.title}
+                  </span>
+                )}
               </Field>
 
-              <Field label="Professor email">
-                <input
-                  required
-                  type="email"
-                  value={professorEmail}
-                  onChange={(e) => setProfessorEmail(e.target.value)}
-                  placeholder="jsmith@fdu.edu"
-                  className={inputClass}
-                />
-              </Field>
+              {isOther && (
+                <Field label="Professor name">
+                  <input
+                    required
+                    value={otherProfName}
+                    onChange={(e) => setOtherProfName(e.target.value)}
+                    placeholder="e.g. Dr. Jane Smith"
+                    className={inputClass}
+                  />
+                </Field>
+              )}
 
               {error && (
                 <p className="rounded-lg border border-crimson-700/60 bg-crimson-900/20 px-3 py-2 text-sm text-crimson-200">
@@ -271,6 +328,20 @@ function shortName(full: string): string {
   if (parts.length === 1) return parts[0];
   const last = parts[parts.length - 1];
   return `Prof. ${last}`;
+}
+
+function initialFacultySelection(c: ClassContext | null): string {
+  if (!c?.professor_email) return "";
+  const slug = facultySlugFromEmail(c.professor_email);
+  if (slug && getFacultyBySlug(slug)) return slug;
+  return OTHER_PROFESSOR_VALUE;
+}
+
+function initialOtherProfName(c: ClassContext | null): string {
+  if (!c?.professor_email) return "";
+  const slug = facultySlugFromEmail(c.professor_email);
+  if (slug && getFacultyBySlug(slug)) return ""; // is a known faculty
+  return c.professor_name ?? "";
 }
 
 const inputClass =

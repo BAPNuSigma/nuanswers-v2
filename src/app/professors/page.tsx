@@ -4,6 +4,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { Wordmark } from "@/components/Wordmark";
 import { isStaffSignedIn } from "@/lib/staff-auth";
 import { StaffSignOutButton } from "@/components/StaffSignOutButton";
+import {
+  SILBERMAN_FACULTY,
+  facultySlugFromEmail,
+  syntheticFacultyEmail,
+  type Department,
+} from "@/lib/fdu-faculty";
 
 type Props = {
   searchParams: Promise<{ email?: string }>;
@@ -23,6 +29,10 @@ export default async function ProfessorsPage({ searchParams }: Props) {
   }
 
   const profEmail = email.trim().toLowerCase();
+  const profSlug = facultySlugFromEmail(profEmail);
+  const staticFaculty = profSlug
+    ? SILBERMAN_FACULTY.find((f) => f.slug === profSlug) ?? null
+    : null;
 
   // ---- aggregate stats for this professor's classes ----
   const sinceDays = 14;
@@ -137,15 +147,21 @@ export default async function ProfessorsPage({ searchParams }: Props) {
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10 sm:px-8">
         <div className="mb-8 flex flex-col gap-1">
           <span className="text-xs uppercase tracking-widest text-gold-400">
-            Professor dashboard
+            {staticFaculty
+              ? `${staticFaculty.department} · Silberman`
+              : "Professor dashboard"}
           </span>
           <h1 className="font-serif text-3xl font-bold tracking-tight sm:text-4xl">
-            Your students on NuAnswers
+            {staticFaculty
+              ? `${staticFaculty.name}'s students`
+              : "Professor's students"}
           </h1>
           <p className="text-sm text-ink-300">
-            Aggregated activity for any session where a student selected{" "}
-            <span className="text-gold-300">{profEmail}</span> as their
-            professor.
+            {staticFaculty?.title
+              ? `${staticFaculty.title}. `
+              : ""}
+            Activity from any session where a student selected this professor
+            in &ldquo;Pick your class.&rdquo;
           </p>
         </div>
 
@@ -323,7 +339,9 @@ function EmptyState({ email }: { email: string }) {
 
 type ProfessorSummary = {
   email: string;
-  name: string | null;
+  name: string;
+  title: string | null;
+  department: Department | "Other";
   sessions: number;
   students: Set<string>;
   courses: Set<string>;
@@ -334,14 +352,31 @@ async function ProfessorDirectory({
 }: {
   supabase: ReturnType<typeof createAdminClient>;
 }) {
-  // Build the directory from chat_sessions (the source of truth for a
-  // student-prof relationship). One row per session, group by professor email.
+  // Step 1: seed the directory from the static FDU Silberman faculty list so
+  // every professor on staff appears whether students have used the bot
+  // with them yet or not.
+  const byEmail = new Map<string, ProfessorSummary>();
+  for (const f of SILBERMAN_FACULTY) {
+    const e = syntheticFacultyEmail(f.slug);
+    byEmail.set(e, {
+      email: e,
+      name: f.name,
+      title: f.title,
+      department: f.department,
+      sessions: 0,
+      students: new Set(),
+      courses: new Set(),
+    });
+  }
+
+  // Step 2: layer in real chat_sessions activity. Sessions for a known
+  // professor bump that prof's stats; sessions for an adjunct (synthetic
+  // email keyed off a typed name) get added as a new "Other" entry.
   const { data: sessions } = await supabase
     .from("chat_sessions")
     .select("user_id, professor_email, professor_name, course_id, course_name")
     .not("professor_email", "is", null);
 
-  const byEmail = new Map<string, ProfessorSummary>();
   for (const s of sessions ?? []) {
     const e = (s.professor_email ?? "").toLowerCase();
     if (!e) continue;
@@ -349,7 +384,9 @@ async function ProfessorDirectory({
     if (!entry) {
       entry = {
         email: e,
-        name: s.professor_name ?? null,
+        name: s.professor_name ?? "Unnamed professor",
+        title: null,
+        department: "Other",
         sessions: 0,
         students: new Set(),
         courses: new Set(),
@@ -359,12 +396,10 @@ async function ProfessorDirectory({
     entry.sessions += 1;
     if (s.user_id) entry.students.add(s.user_id);
     if (s.course_id) entry.courses.add(s.course_id);
-    if (!entry.name && s.professor_name) entry.name = s.professor_name;
   }
 
-  // Also pull profs students have set on their profile but who haven't shown
-  // up in a chat session yet — so they appear in the directory with zero
-  // activity rather than being invisible.
+  // Step 3: also include profs students set on their profile but who
+  // haven't run a chat session yet (otherwise they'd be invisible).
   const { data: profileProfs } = await supabase
     .from("profiles")
     .select("current_professor_email, current_professor_name, current_course_id")
@@ -375,16 +410,36 @@ async function ProfessorDirectory({
     if (!e || byEmail.has(e)) continue;
     byEmail.set(e, {
       email: e,
-      name: p.current_professor_name ?? null,
+      name: p.current_professor_name ?? "Unnamed professor",
+      title: null,
+      department: "Other",
       sessions: 0,
       students: new Set(),
       courses: p.current_course_id ? new Set([p.current_course_id]) : new Set(),
     });
   }
 
-  const directory = Array.from(byEmail.values()).sort(
-    (a, b) => b.sessions - a.sessions
-  );
+  // Group by department, sort: most-active first within department,
+  // departments in canonical order with "Other" last.
+  const directory = Array.from(byEmail.values());
+  const groups = new Map<string, ProfessorSummary[]>();
+  for (const p of directory) {
+    const key = p.department;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(p);
+  }
+  for (const list of groups.values()) {
+    list.sort((a, b) => {
+      if (b.sessions !== a.sessions) return b.sessions - a.sessions;
+      return a.name.localeCompare(b.name);
+    });
+  }
+  const groupOrder: Array<Department | "Other"> = [
+    "Accounting",
+    "Finance & Economics",
+    "Management & Marketing",
+    "Other",
+  ];
 
   return (
     <div className="flex min-h-screen flex-col bg-background bg-grain">
@@ -414,48 +469,80 @@ async function ProfessorDirectory({
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10 sm:px-8">
         <div className="mb-8 flex flex-col gap-1">
           <span className="text-xs uppercase tracking-widest text-gold-400">
-            Professor directory
+            Silberman College of Business
           </span>
           <h1 className="font-serif text-3xl font-bold tracking-tight sm:text-4xl">
-            All professors using NuAnswers
+            Faculty directory
           </h1>
           <p className="text-sm text-ink-300">
-            Click a professor to drill into their per-class detail view.
+            Click any professor to see their NuAnswers activity. Profs with
+            no activity yet are listed at the bottom of each department.
           </p>
         </div>
 
-        {directory.length === 0 ? (
-          <div className="rounded-2xl border border-gold-700/40 bg-gold-900/15 p-8 text-center">
-            <div className="font-serif text-xl text-gold-200">No professors yet</div>
-            <p className="mx-auto mt-3 max-w-md text-sm text-ink-200">
-              Professors show up here once at least one student lists them in
-              &ldquo;Pick your class&rdquo; in the chat.
-            </p>
-          </div>
-        ) : (
-          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {directory.map((p) => (
-              <li key={p.email}>
-                <Link
-                  href={`/professors?email=${encodeURIComponent(p.email)}`}
-                  className="block rounded-2xl border border-border bg-surface p-5 transition hover:border-gold-600 hover:bg-surface-elevated"
-                >
-                  <div className="font-serif text-lg font-semibold">
-                    {p.name ?? "Unnamed professor"}
-                  </div>
-                  <div className="mt-1 truncate text-xs text-ink-400">
-                    {p.email}
-                  </div>
-                  <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                    <Mini label="Students" value={p.students.size} />
-                    <Mini label="Sessions" value={p.sessions} />
-                    <Mini label="Courses" value={p.courses.size} />
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+        <div className="flex flex-col gap-10">
+          {groupOrder.map((dept) => {
+            const list = groups.get(dept) ?? [];
+            if (list.length === 0) return null;
+            return (
+              <section key={dept}>
+                <h2 className="mb-3 font-serif text-lg font-semibold text-foreground">
+                  {dept}
+                  <span className="ml-2 text-xs text-ink-400">{list.length}</span>
+                </h2>
+                <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {list.map((p) => {
+                    const slug = facultySlugFromEmail(p.email);
+                    const isStaticFaculty = !!slug;
+                    const isActive = p.sessions > 0;
+                    return (
+                      <li key={p.email}>
+                        <Link
+                          href={`/professors?email=${encodeURIComponent(p.email)}`}
+                          className={`block rounded-2xl border p-5 transition ${
+                            isActive
+                              ? "border-gold-700/50 bg-gold-900/10 hover:border-gold-500"
+                              : "border-border bg-surface hover:border-gold-600 hover:bg-surface-elevated"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="font-serif text-base font-semibold leading-tight">
+                                {p.name}
+                              </div>
+                              {p.title && (
+                                <div className="mt-1 line-clamp-2 text-[11px] text-ink-400">
+                                  {p.title}
+                                </div>
+                              )}
+                              {!isStaticFaculty && (
+                                <div className="mt-1 text-[10px] uppercase tracking-wider text-ink-500">
+                                  Adjunct / typed by student
+                                </div>
+                              )}
+                            </div>
+                            {isActive && (
+                              <span
+                                aria-hidden
+                                className="mt-1 h-2 w-2 flex-none rounded-full bg-gold-400"
+                                title="Has student activity"
+                              />
+                            )}
+                          </div>
+                          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                            <Mini label="Students" value={p.students.size} />
+                            <Mini label="Sessions" value={p.sessions} />
+                            <Mini label="Courses" value={p.courses.size} />
+                          </div>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            );
+          })}
+        </div>
       </main>
     </div>
   );
