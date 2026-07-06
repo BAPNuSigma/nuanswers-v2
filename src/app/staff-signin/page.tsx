@@ -44,7 +44,7 @@ export default async function StaffSignInPage({ searchParams }: Props) {
         <StaffSignInForm next={target} initialError={error ?? null} />
 
         <p className="mt-8 text-xs text-ink-400">
-          Looking for the student tutor?{" "}
+          Looking for the student assistant?{" "}
           <Link
             href="/chat"
             className="text-gold-300 underline-offset-2 hover:underline"

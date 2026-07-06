@@ -50,7 +50,7 @@ export async function POST(req: Request) {
   if (hoursStatus.active) {
     return new Response(
       JSON.stringify({
-        error: `In-person tutoring is happening right now (${hoursStatus.day} ${hoursStatus.timeET} ET). The bot returns at ${hoursStatus.windowEnd}.`,
+        error: `In-person tutoring is happening right now (${hoursStatus.day} ${hoursStatus.timeET} ET). NuAnswers returns at ${hoursStatus.windowEnd}.`,
       }),
       {
         status: 423, // Locked

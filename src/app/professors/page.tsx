@@ -261,7 +261,7 @@ export default async function ProfessorsPage({ searchParams }: Props) {
           <>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Stat label="Students" value={uniqueStudents} />
-              <Stat label="Tutoring sessions" value={totalSessions} />
+              <Stat label="Study sessions" value={totalSessions} />
               <Stat label="Messages exchanged" value={totalMessages} />
               <Stat label="Files uploaded" value={filesCount ?? 0} />
             </div>
@@ -631,7 +631,7 @@ async function ProfessorDirectory({
               href="/chat"
               className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-ink-200 transition hover:border-gold-600 hover:text-gold-300"
             >
-              Tutor view
+              Student view
             </Link>
             <ThemeToggle />
             <StaffSignOutButton />

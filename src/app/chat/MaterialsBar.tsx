@@ -239,7 +239,7 @@ export function MaterialsBar({
                     Course materials
                   </div>
                   <p className="mt-1 text-xs text-ink-300">
-                    The tutor uses these to ground every answer.
+                    NuAnswers uses these to ground every answer.
                   </p>
                 </div>
                 <button

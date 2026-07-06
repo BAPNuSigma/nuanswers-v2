@@ -222,7 +222,7 @@ export default async function AdminPage() {
               href="/chat"
               className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-ink-200 transition hover:border-gold-600 hover:text-gold-300"
             >
-              Tutor view
+              Student view
             </Link>
             <ThemeToggle />
             <StaffSignOutButton />
@@ -251,7 +251,7 @@ export default async function AdminPage() {
             sublabel={`${activeUserIds.size} active in ${sinceDays}d`}
           />
           <Stat
-            label="Tutoring sessions"
+            label="Study sessions"
             value={totalSessions}
             sublabel="all time"
           />
@@ -261,7 +261,7 @@ export default async function AdminPage() {
             sublabel={
               helpfulPct !== null
                 ? `${helpfulPct}% rated helpful`
-                : "student + tutor"
+                : "student + assistant"
             }
           />
           <Stat

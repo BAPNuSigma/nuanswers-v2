@@ -20,14 +20,14 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "NuAnswers — AI Tutor for Accounting & Finance",
+  title: "NuAnswers — AI Teaching Assistant for Accounting & Finance",
   description:
-    "A step-by-step AI tutor built by Beta Alpha Psi, Nu Sigma Chapter. Guides you to the answer — never just gives it.",
+    "An AI teaching assistant built by Beta Alpha Psi, Nu Sigma Chapter. Guides students to the answer — never just gives it — and shows professors where the class needs help.",
   metadataBase: new URL("https://nuanswers.org"),
   openGraph: {
-    title: "NuAnswers — AI Tutor for Accounting & Finance",
+    title: "NuAnswers — AI Teaching Assistant for Accounting & Finance",
     description:
-      "Step-by-step AI tutoring for FDU students. Guides you to the answer — never just gives it.",
+      "An AI teaching assistant for FDU students. Guides you to the answer — never just gives it.",
     type: "website",
   },
 };

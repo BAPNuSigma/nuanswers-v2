@@ -200,7 +200,7 @@ export default function LoginPage() {
 
         <p className="mt-8 text-center text-xs text-ink-400">
           By signing in you agree that NuAnswers logs your usage to improve
-          tutoring for the BAP Nu Sigma chapter.
+          the assistant for the BAP Nu Sigma chapter.
         </p>
       </main>
     </div>

@@ -340,7 +340,7 @@ export function ChatClient({
                   }
                 }}
                 rows={1}
-                placeholder="Ask a question — the tutor will guide you, not answer for you."
+                placeholder="Ask a question — NuAnswers will guide you, not answer for you."
                 className="w-full resize-none rounded-2xl border border-border bg-surface px-4 py-3 pr-12 text-base text-foreground placeholder:text-ink-400 focus:border-gold-600 focus:outline-none focus:ring-2 focus:ring-gold-600/30"
                 style={{ minHeight: "48px", maxHeight: "160px" }}
                 disabled={isResponding}
@@ -459,7 +459,7 @@ function Welcome({
         <TipCard
           step="1"
           title="Pick your class"
-          body="Tap the 🎓 button at the top so the tutor knows your course + professor."
+          body="Tap the 🎓 button at the top so NuAnswers knows your course + professor."
         />
         <TipCard
           step="2"
@@ -469,7 +469,7 @@ function Welcome({
         <TipCard
           step="3"
           title="Ask anything"
-          body="The tutor will walk you through it one question at a time."
+          body="NuAnswers will walk you through it one question at a time."
         />
       </div>
 
@@ -556,7 +556,7 @@ function ModeSelector({
                 Choose your mode
               </div>
               <p className="mb-5 text-xs text-ink-300">
-                How do you learn best? The tutor adapts its style to match.
+                How do you learn best? NuAnswers adapts its style to match.
                 Switch anytime — even mid-problem.
               </p>
 
@@ -843,7 +843,7 @@ function FeedbackLink({
                 </button>
               </div>
               <p className="mb-4 text-xs text-ink-300">
-                Bugs, weird tutor responses, feature requests — anything. Goes
+                Bugs, weird responses, feature requests — anything. Goes
                 straight to the chapter&apos;s officer dashboard.
               </p>
 

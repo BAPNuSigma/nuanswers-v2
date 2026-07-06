@@ -37,7 +37,7 @@ export default async function Home() {
           </div>
 
           <h1 className="font-serif text-4xl font-bold leading-[1.05] tracking-tight sm:text-6xl md:text-7xl">
-            The tutor that
+            The teaching assistant that
             <br />
             <span className="text-gold-400">guides you to the answer</span>
             <br />
@@ -45,9 +45,10 @@ export default async function Home() {
           </h1>
 
           <p className="mt-8 max-w-2xl text-lg text-ink-200 sm:text-xl">
-            NuAnswers is a step-by-step AI tutor for accounting and finance
-            students. It asks the right questions so you learn to solve problems
-            yourself — not just copy answers.
+            NuAnswers is an AI teaching assistant for accounting and finance
+            students. It asks the right questions so you learn to solve
+            problems yourself — and shows your professors exactly where the
+            class needs the most help.
           </p>
 
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row">
@@ -55,7 +56,7 @@ export default async function Home() {
               href="/chat"
               className="group inline-flex h-12 items-center gap-2 rounded-full bg-crimson-700 px-7 text-base font-semibold text-white shadow-lg shadow-crimson-900/40 transition hover:bg-crimson-600"
             >
-              Start a tutoring session
+              Start a session
               <span
                 aria-hidden
                 className="transition group-hover:translate-x-0.5"
@@ -112,7 +113,7 @@ export default async function Home() {
             <Feature
               number="01"
               title="Ask one question at a time"
-              body="The tutor breaks problems into small steps and waits for your response. No info-dumping."
+              body="NuAnswers breaks problems into small steps and waits for your response. No info-dumping."
             />
             <Feature
               number="02"
@@ -122,7 +123,7 @@ export default async function Home() {
             <Feature
               number="03"
               title="Grounded in your course"
-              body="Upload your syllabus, slides, photos of homework, and notes. The tutor uses your materials — not random internet sources."
+              body="Upload your syllabus, slides, photos of homework, and notes. NuAnswers uses your materials — not random internet sources."
             />
           </div>
         </section>
@@ -137,7 +138,7 @@ export default async function Home() {
               Upload anything your professor gave you.
             </h3>
             <p className="mt-3 max-w-2xl text-sm text-ink-200 sm:text-base">
-              The tutor reads PDFs, Word docs, PowerPoint slide decks, Excel
+              NuAnswers reads PDFs, Word docs, PowerPoint slide decks, Excel
               spreadsheets, CSVs, plain text, and even photos of homework or
               the whiteboard. It uses every uploaded file to ground its
               questions in <em>your</em> course — not the internet.
@@ -154,6 +155,46 @@ export default async function Home() {
           </div>
         </section>
 
+        {/* BOTH SIDES OF THE CLASSROOM */}
+        <section className="mx-auto w-full max-w-6xl px-6 pb-12 sm:px-8 sm:pb-20">
+          <div className="mb-10 text-center">
+            <p className="mb-3 text-xs uppercase tracking-widest text-gold-400">
+              More than a tutor
+            </p>
+            <h2 className="font-serif text-3xl font-bold sm:text-4xl">
+              One assistant. Both sides of the classroom.
+            </h2>
+          </div>
+          <div className="grid gap-6 sm:grid-cols-2">
+            <div className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
+              <p className="text-xs uppercase tracking-widest text-gold-400">
+                For students
+              </p>
+              <h3 className="mt-3 font-serif text-xl font-semibold">
+                A patient guide, 24/7
+              </h3>
+              <p className="mt-3 text-sm leading-relaxed text-ink-200">
+                Work through homework the way a great TA would walk you through
+                it in office hours — one question at a time, grounded in your
+                own course materials, any hour of the night.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
+              <p className="text-xs uppercase tracking-widest text-gold-400">
+                For professors
+              </p>
+              <h3 className="mt-3 font-serif text-xl font-semibold">
+                See where your class struggles
+              </h3>
+              <p className="mt-3 text-sm leading-relaxed text-ink-200">
+                A private dashboard shows which topics your students ask about
+                most, which questions keep coming up, and who needs help —
+                before the exam, not after.
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* STATS */}
         {stats.totalStudents > 0 && (
           <section className="mx-auto w-full max-w-6xl px-6 pb-20 sm:px-8">
@@ -163,7 +204,7 @@ export default async function Home() {
               </p>
               <div className="mt-6 grid grid-cols-2 gap-6 text-center sm:grid-cols-4">
                 <BigStat label="Students" value={stats.totalStudents} />
-                <BigStat label="Tutoring sessions" value={stats.totalSessions} />
+                <BigStat label="Study sessions" value={stats.totalSessions} />
                 <BigStat
                   label="Questions answered"
                   value={stats.totalMessages}
@@ -190,7 +231,7 @@ export default async function Home() {
             href="/chat"
             className="mt-8 inline-flex h-12 items-center gap-2 rounded-full bg-crimson-700 px-7 text-base font-semibold text-white shadow-lg shadow-crimson-900/40 transition hover:bg-crimson-600"
           >
-            Start a tutoring session →
+            Start a session →
           </Link>
         </section>
       </main>
