@@ -18,6 +18,14 @@ import { ChatHistory } from "./ChatHistory";
 import { ClassSelector } from "./ClassSelector";
 import { professorLastName, type ClassContext } from "@/lib/auth";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import {
+  DEFAULT_LEARNING_MODE,
+  LEARNING_MODES,
+  MODE_STORAGE_KEY,
+  getModeInfo,
+  isLearningMode,
+  type LearningMode,
+} from "@/lib/learning-modes";
 
 // Starter questions students can tap on the welcome screen, grouped by topic
 // so the screen feels like a real "what can this thing do?" menu instead of
@@ -104,6 +112,40 @@ export function ChatClient({
 }: ChatClientProps) {
   const clientSessionId = useMemo(() => newSessionId(), []);
   const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  // Learning mode — how the tutor teaches (visual / classic / hands-on).
+  // Kept in localStorage so it follows the student across sessions, and in
+  // a ref so the chat transport always sends the latest value.
+  const [learningMode, setLearningMode] = useState<LearningMode>(
+    DEFAULT_LEARNING_MODE
+  );
+  const learningModeRef = useRef<LearningMode>(DEFAULT_LEARNING_MODE);
+  learningModeRef.current = learningMode;
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(MODE_STORAGE_KEY);
+      if (isLearningMode(stored)) setLearningMode(stored);
+    } catch {
+      // localStorage unavailable (private browsing) — default stands.
+    }
+  }, []);
+
+  function changeLearningMode(next: LearningMode) {
+    if (next === learningModeRef.current) return;
+    setLearningMode(next);
+    try {
+      window.localStorage.setItem(MODE_STORAGE_KEY, next);
+    } catch {
+      // Non-fatal — mode still applies for this visit.
+    }
+    logEvent({
+      event_type: "learning_mode_changed",
+      user_id: userId,
+      session_id: clientSessionId,
+      metadata: { mode: next },
+    });
+  }
   const [activeSessionId, setActiveSessionId] = useState<string | null>(
     initialSessionId
   );
@@ -124,6 +166,7 @@ export function ChatClient({
             ...body,
             messages,
             sessionId: sessionIdRef.current,
+            learningMode: learningModeRef.current,
           },
         };
       },
@@ -201,7 +244,7 @@ export function ChatClient({
       event_type: "chat_message_sent",
       user_id: userId,
       session_id: clientSessionId,
-      metadata: { length: trimmed.length },
+      metadata: { length: trimmed.length, mode: learningModeRef.current },
     });
     setInput("");
     await sendMessage({ text: trimmed });
@@ -215,6 +258,7 @@ export function ChatClient({
             <Wordmark size="sm" />
           </Link>
           <div className="flex items-center gap-2">
+            <ModeSelector mode={learningMode} onChange={changeLearningMode} />
             <ClassSelector initialClass={initialClass} />
             <MaterialsBar
               initialDocuments={initialDocuments}
@@ -245,7 +289,13 @@ export function ChatClient({
           {!profileComplete && !bannerDismissed && (
             <ProfileBanner onDismiss={() => setBannerDismissed(true)} />
           )}
-          {!hasMessages && <Welcome onPick={handleSend} />}
+          {!hasMessages && (
+            <Welcome
+              onPick={handleSend}
+              mode={learningMode}
+              onModeChange={changeLearningMode}
+            />
+          )}
           {hasMessages && (
             <ul className="flex flex-col gap-6">
               {messages.map((m) => (
@@ -347,7 +397,15 @@ function ProfileBanner({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
-function Welcome({ onPick }: { onPick: (t: string) => void }) {
+function Welcome({
+  onPick,
+  mode,
+  onModeChange,
+}: {
+  onPick: (t: string) => void;
+  mode: LearningMode;
+  onModeChange: (m: LearningMode) => void;
+}) {
   return (
     <div className="flex flex-col items-center pt-6 text-center sm:pt-12">
       <Wordmark size="lg" />
@@ -358,6 +416,44 @@ function Welcome({ onPick }: { onPick: (t: string) => void }) {
         the right questions. I won&apos;t give you the answer — you&apos;ll get
         there yourself.
       </p>
+
+      <div className="mt-8 w-full">
+        <p className="mb-3 text-xs uppercase tracking-widest text-ink-400">
+          Choose your mode
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          {LEARNING_MODES.map((m) => {
+            const active = m.id === mode;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => onModeChange(m.id)}
+                aria-pressed={active}
+                className={`flex flex-col items-center gap-1 rounded-2xl border p-3 transition ${
+                  active
+                    ? "border-gold-500 bg-gold-900/15 ring-2 ring-gold-600/30"
+                    : "border-border bg-surface hover:border-gold-600 hover:bg-surface-elevated"
+                }`}
+              >
+                <span className="text-xl" aria-hidden>
+                  {m.emoji}
+                </span>
+                <span
+                  className={`text-sm font-semibold ${
+                    active ? "text-gold-200" : "text-foreground"
+                  }`}
+                >
+                  {m.label}
+                </span>
+                <span className="hidden text-[11px] leading-snug text-ink-300 sm:block">
+                  {m.tagline}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       <div className="mt-6 grid w-full gap-3 text-left sm:grid-cols-3">
         <TipCard
@@ -403,6 +499,122 @@ function Welcome({ onPick }: { onPick: (t: string) => void }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function ModeSelector({
+  mode,
+  onChange,
+}: {
+  mode: LearningMode;
+  onChange: (m: LearningMode) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const info = getModeInfo(mode);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border bg-surface px-3 text-xs font-medium text-ink-100 transition hover:border-gold-600 hover:text-gold-300"
+        title={`Learning mode: ${info.label} — tap to switch`}
+      >
+        <span aria-hidden>{info.emoji}</span>
+        <span className="hidden sm:inline">{info.label}</span>
+      </button>
+
+      {open && typeof document !== "undefined" && createPortal(
+        <div
+          className="fixed inset-0 z-[100] overflow-y-auto bg-black/60 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setOpen(false);
+          }}
+        >
+          <div
+            className="flex min-h-full items-center justify-center px-4 py-6"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setOpen(false);
+            }}
+          >
+            <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+              <div className="mb-1 font-serif text-xl font-bold tracking-tight">
+                Choose your mode
+              </div>
+              <p className="mb-5 text-xs text-ink-300">
+                How do you learn best? The tutor adapts its style to match.
+                Switch anytime — even mid-problem.
+              </p>
+
+              <div className="flex flex-col gap-3">
+                {LEARNING_MODES.map((m) => {
+                  const active = m.id === mode;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        onChange(m.id);
+                        setOpen(false);
+                      }}
+                      className={`flex items-start gap-3 rounded-2xl border p-4 text-left transition ${
+                        active
+                          ? "border-gold-500 bg-gold-900/15 ring-2 ring-gold-600/30"
+                          : "border-border bg-surface-elevated hover:border-gold-600"
+                      }`}
+                    >
+                      <span
+                        className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-surface text-xl"
+                        aria-hidden
+                      >
+                        {m.emoji}
+                      </span>
+                      <span className="flex flex-col gap-0.5">
+                        <span className="flex items-center gap-2">
+                          <span
+                            className={`text-sm font-semibold ${
+                              active ? "text-gold-200" : "text-foreground"
+                            }`}
+                          >
+                            {m.label}
+                          </span>
+                          <span className="text-[11px] italic text-ink-400">
+                            “{m.tagline}”
+                          </span>
+                          {active && (
+                            <span className="rounded-full bg-gold-600/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gold-300">
+                              Active
+                            </span>
+                          )}
+                        </span>
+                        <span className="text-xs leading-relaxed text-ink-300">
+                          {m.description}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
   );
 }
 

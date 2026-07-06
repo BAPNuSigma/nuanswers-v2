@@ -1,6 +1,12 @@
 import { openai } from "@ai-sdk/openai";
 import { streamText, convertToModelMessages, type UIMessage } from "ai";
 import { TUTORING_SYSTEM_PROMPT } from "@/lib/tutoring-prompt";
+import {
+  DEFAULT_LEARNING_MODE,
+  MODE_PROMPT_INSTRUCTIONS,
+  isLearningMode,
+  type LearningMode,
+} from "@/lib/learning-modes";
 import { createClient } from "@/lib/supabase/server";
 import { retrieveRelevantChunks, formatRagContext } from "@/lib/rag";
 import { profileClassContext, type Profile } from "@/lib/auth";
@@ -12,6 +18,7 @@ export const maxDuration = 60;
 type ChatRequestBody = {
   messages: UIMessage[];
   sessionId?: string | null;
+  learningMode?: string | null;
 };
 
 export async function POST(req: Request) {
@@ -52,8 +59,16 @@ export async function POST(req: Request) {
     );
   }
 
-  const { messages, sessionId: incomingSessionId } =
-    (await req.json()) as ChatRequestBody;
+  const {
+    messages,
+    sessionId: incomingSessionId,
+    learningMode: rawLearningMode,
+  } = (await req.json()) as ChatRequestBody;
+
+  // Unknown/missing mode falls back to Classic — old clients keep working.
+  const learningMode: LearningMode = isLearningMode(rawLearningMode)
+    ? rawLearningMode
+    : DEFAULT_LEARNING_MODE;
 
   // Look up the user's profile so we know their current class context.
   const { data: profile } = await supabase
@@ -189,7 +204,11 @@ export async function POST(req: Request) {
     }
   }
 
-  const systemParts = [TUTORING_SYSTEM_PROMPT, inventoryContext];
+  const systemParts = [
+    TUTORING_SYSTEM_PROMPT,
+    MODE_PROMPT_INSTRUCTIONS[learningMode],
+    inventoryContext,
+  ];
   if (ragContext) systemParts.push(ragContext);
 
   const modelMessages = await convertToModelMessages(messages);

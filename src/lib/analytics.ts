@@ -7,6 +7,7 @@ export type AnalyticsEventType =
   | "file_uploaded"
   | "feedback_submitted"
   | "user_feedback_text"
+  | "learning_mode_changed"
   | "login"
   | "signup"
   | "tutoring_hours_blocked"
