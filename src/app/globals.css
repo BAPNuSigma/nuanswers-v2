@@ -120,6 +120,49 @@ html, body {
   font-family: var(--font-serif);
 }
 
+/*
+ * Motion — the "game feel" layer. Small, fast, springy entrances so the
+ * chat feels alive without being childish. Everything respects
+ * prefers-reduced-motion.
+ */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-rise {
+  animation: rise-in 0.35s cubic-bezier(0.21, 1.02, 0.73, 1) both;
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  60% {
+    transform: scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.animate-pop {
+  animation: pop-in 0.3s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise,
+  .animate-pop {
+    animation: none;
+  }
+}
+
 /* Subtle gold dot grid on dark, slightly stronger on light so it's visible. */
 .bg-grain {
   background-image:

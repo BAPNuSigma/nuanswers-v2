@@ -131,6 +131,32 @@ export function ChatClient({
     }
   }, []);
 
+  // Day streak — consecutive days the student has opened the assistant.
+  // Pure localStorage; resets if they skip a day.
+  const [streak, setStreak] = useState(1);
+  useEffect(() => {
+    try {
+      const today = new Date().toLocaleDateString("en-CA");
+      const yesterday = new Date(Date.now() - 86_400_000).toLocaleDateString(
+        "en-CA"
+      );
+      const raw = window.localStorage.getItem(STREAK_STORAGE_KEY);
+      let next = 1;
+      if (raw) {
+        const saved = JSON.parse(raw) as { day?: string; count?: number };
+        if (saved.day === today) next = saved.count || 1;
+        else if (saved.day === yesterday) next = (saved.count || 0) + 1;
+      }
+      window.localStorage.setItem(
+        STREAK_STORAGE_KEY,
+        JSON.stringify({ day: today, count: next })
+      );
+      setStreak(next);
+    } catch {
+      // localStorage unavailable — streak just stays at 1.
+    }
+  }, []);
+
   function changeLearningMode(next: LearningMode) {
     if (next === learningModeRef.current) return;
     setLearningMode(next);
@@ -236,6 +262,7 @@ export function ChatClient({
 
   const isResponding = status === "streaming" || status === "submitted";
   const hasMessages = messages.length > 0;
+  const userMessageCount = messages.filter((m) => m.role === "user").length;
 
   async function handleSend(text: string) {
     const trimmed = text.trim();
@@ -267,6 +294,7 @@ export function ChatClient({
               )}
             />
             <ChatHistory activeSessionId={activeSessionId} />
+            <StreakChip streak={streak} />
             <ThemeToggle />
             <span className="hidden text-xs text-ink-300 md:inline">
               {fullName}
@@ -349,12 +377,13 @@ export function ChatClient({
             <button
               type="submit"
               disabled={!input.trim() || isResponding}
-              className="inline-flex h-12 items-center gap-1 rounded-2xl bg-crimson-700 px-5 font-semibold text-white transition hover:bg-crimson-600 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex h-12 items-center gap-1 rounded-2xl bg-crimson-700 px-5 font-semibold text-white transition hover:bg-crimson-600 hover:shadow-lg hover:shadow-crimson-900/40 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Send
             </button>
           </form>
-          <div className="flex items-center justify-end pt-1">
+          <div className="flex items-center justify-between pt-1">
+            <SessionMomentum count={userMessageCount} />
             <FeedbackLink userId={userId} clientSessionId={clientSessionId} />
           </div>
         </div>
@@ -407,7 +436,7 @@ function Welcome({
   onModeChange: (m: LearningMode) => void;
 }) {
   return (
-    <div className="flex flex-col items-center pt-6 text-center sm:pt-12">
+    <div className="animate-rise flex flex-col items-center pt-6 text-center sm:pt-12">
       <Wordmark size="lg" />
       <p className="mt-6 max-w-xl text-lg text-ink-200">
         Hi — I&apos;m{" "}
@@ -430,7 +459,7 @@ function Welcome({
                 type="button"
                 onClick={() => onModeChange(m.id)}
                 aria-pressed={active}
-                className={`flex flex-col items-center gap-1 rounded-2xl border p-3 transition ${
+                className={`flex flex-col items-center gap-1 rounded-2xl border p-3 transition hover:-translate-y-0.5 active:scale-95 ${
                   active
                     ? "border-gold-500 bg-gold-900/15 ring-2 ring-gold-600/30"
                     : "border-border bg-surface hover:border-gold-600 hover:bg-surface-elevated"
@@ -488,7 +517,7 @@ function Welcome({
                   <button
                     key={q}
                     onClick={() => onPick(q)}
-                    className="rounded-xl border border-border bg-surface p-3 text-left text-sm text-ink-100 transition hover:border-gold-600 hover:bg-surface-elevated"
+                    className="rounded-xl border border-border bg-surface p-3 text-left text-sm text-ink-100 transition hover:-translate-y-0.5 hover:border-gold-600 hover:bg-surface-elevated active:scale-95"
                   >
                     {q}
                   </button>
@@ -498,6 +527,57 @@ function Welcome({
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+const STREAK_STORAGE_KEY = "nuanswers-streak";
+
+/**
+ * 🔥 N-day streak chip. Only appears from day 2 on — a streak of 1 is
+ * just "you showed up," which isn't worth a badge.
+ */
+function StreakChip({ streak }: { streak: number }) {
+  if (streak < 2) return null;
+  return (
+    <span
+      className="animate-pop inline-flex h-8 items-center gap-1 rounded-full border border-gold-700/40 bg-gold-900/15 px-2.5 text-xs font-semibold text-gold-200"
+      title={`${streak}-day streak — come back tomorrow to keep it going!`}
+    >
+      <span aria-hidden>🔥</span>
+      {streak}
+    </span>
+  );
+}
+
+const MOMENTUM_TIERS = [
+  { min: 6, label: "On fire", emoji: "🔥" },
+  { min: 3, label: "In the zone", emoji: "🎯" },
+  { min: 1, label: "Warming up", emoji: "⚡" },
+];
+
+/**
+ * Session momentum meter — fills as the student works through questions
+ * this session. Pure encouragement; no data leaves the page.
+ */
+function SessionMomentum({ count }: { count: number }) {
+  if (count === 0) return <span />;
+  const tier = MOMENTUM_TIERS.find((t) => count >= t.min) ?? MOMENTUM_TIERS[2];
+  const pct = Math.min((count / 6) * 100, 100);
+  return (
+    <div
+      className="flex items-center gap-2"
+      title={`${count} question${count === 1 ? "" : "s"} this session`}
+    >
+      <div className="h-1.5 w-16 overflow-hidden rounded-full bg-surface-elevated sm:w-24">
+        <div
+          className="h-full rounded-full bg-gold-500 transition-all duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className="text-[11px] font-medium text-gold-400">
+        <span aria-hidden>{tier.emoji}</span> {tier.label}
+      </span>
     </div>
   );
 }
@@ -674,7 +754,7 @@ function MessageBubble({
 
   return (
     <li
-      className={`flex ${isUser ? "justify-end" : "justify-start"} items-start gap-3`}
+      className={`flex ${isUser ? "justify-end" : "justify-start"} animate-rise items-start gap-3`}
     >
       {!isUser && (
         <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-crimson-700 font-serif text-sm font-bold text-gold-200">
@@ -730,7 +810,7 @@ function MessageBubble({
 
 function TypingIndicator() {
   return (
-    <li className="flex items-start gap-3">
+    <li className="animate-rise flex items-start gap-3">
       <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-crimson-700 font-serif text-sm font-bold text-gold-200">
         N
       </div>
