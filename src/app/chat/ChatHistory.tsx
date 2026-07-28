@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 
 type SessionRow = {
@@ -20,7 +21,6 @@ export function ChatHistory({
   const [open, setOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -33,12 +33,12 @@ export function ChatHistory({
   }, [open]);
 
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (!dropdownRef.current) return;
-      if (!dropdownRef.current.contains(e.target as Node)) setOpen(false);
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
     }
-    if (open) document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
   function handleNewChat() {
@@ -67,7 +67,7 @@ export function ChatHistory({
   }
 
   return (
-    <div ref={dropdownRef} className="relative">
+    <>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -79,8 +79,17 @@ export function ChatHistory({
         <span aria-hidden className="text-ink-400">▾</span>
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-10 z-30 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-border bg-surface shadow-xl">
+      {/* Portaled to <body>: the header's backdrop-blur creates a stacking
+          context that traps absolutely-positioned children underneath the
+          chat content — same bug the ClassSelector modal hit. */}
+      {open && typeof document !== "undefined" && createPortal(
+        <div
+          className="fixed inset-0 z-[100]"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute right-4 top-16 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl">
           <button
             type="button"
             onClick={handleNewChat}
@@ -142,8 +151,10 @@ export function ChatHistory({
                 );
               })}
           </div>
-        </div>
+          </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }

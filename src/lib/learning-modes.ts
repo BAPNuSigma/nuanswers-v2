@@ -8,7 +8,7 @@
  * modes only change HOW guidance is delivered, never how much is revealed.
  */
 
-export type LearningMode = "visual" | "verbal" | "hands_on";
+export type LearningMode = "auto" | "visual" | "verbal" | "hands_on";
 
 export type LearningModeInfo = {
   id: LearningMode;
@@ -19,6 +19,14 @@ export type LearningModeInfo = {
 };
 
 export const LEARNING_MODES: LearningModeInfo[] = [
+  {
+    id: "auto",
+    label: "Auto",
+    emoji: "✨",
+    tagline: "Pick for me",
+    description:
+      "NuAnswers reads each question and picks the best teaching style on its own.",
+  },
   {
     id: "visual",
     label: "Visual",
@@ -50,7 +58,12 @@ export const DEFAULT_LEARNING_MODE: LearningMode = "verbal";
 export const MODE_STORAGE_KEY = "nuanswers-learning-mode";
 
 export function isLearningMode(value: unknown): value is LearningMode {
-  return value === "visual" || value === "verbal" || value === "hands_on";
+  return (
+    value === "auto" ||
+    value === "visual" ||
+    value === "verbal" ||
+    value === "hands_on"
+  );
 }
 
 export function getModeInfo(mode: LearningMode): LearningModeInfo {
@@ -62,6 +75,13 @@ export function getModeInfo(mode: LearningMode): LearningModeInfo {
  * base rules (especially never-give-the-answer) always win on conflict.
  */
 export const MODE_PROMPT_INSTRUCTIONS: Record<LearningMode, string> = {
+  auto: `## Active learning mode: AUTO ✨
+The student asked NuAnswers to pick the teaching style per question. For EACH reply, silently choose the style that fits what they just asked:
+- Structure-heavy topics (journal entries, T-accounts, financial statements, ratios with several inputs) → teach VISUALLY: small plain-text T-accounts, mini tables, or step maps, always with a "?" blank where the student's answer goes.
+- Procedural or practice-oriented questions ("how do I…", "walk me through…", homework attempts) → teach HANDS-ON: end the reply with one tiny do-it-now task (compute one number, classify one account).
+- Conceptual or definitional questions ("what is…", "why does…") → teach CLASSICALLY: plain conversational Socratic dialogue, no lists or tables.
+Never announce which style you picked — just use it. All core rules still apply: one question at a time, NEVER reveal the answer, the final number, or the completed solution.`,
+
   visual: `## Active learning mode: VISUAL 🎨
 The student chose Visual mode — they learn best when they can SEE the structure.
 - When it clarifies a concept, lay it out visually in plain text: a T-account, a small two-column table, a timeline, or an indented step map.

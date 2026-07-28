@@ -450,7 +450,7 @@ function Welcome({
         <p className="mb-3 text-xs uppercase tracking-widest text-ink-400">
           Choose your mode
         </p>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {LEARNING_MODES.map((m) => {
             const active = m.id === mode;
             return (
@@ -567,7 +567,7 @@ function SessionMomentum({ count }: { count: number }) {
   return (
     <div
       className="flex items-center gap-2"
-      title={`${count} question${count === 1 ? "" : "s"} this session`}
+      title={`Session momentum — fills as you work through questions. ${count} question${count === 1 ? "" : "s"} so far this session.`}
     >
       <div className="h-1.5 w-16 overflow-hidden rounded-full bg-surface-elevated sm:w-24">
         <div
