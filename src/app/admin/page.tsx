@@ -97,11 +97,14 @@ export default async function AdminPage() {
 
   // Build lookups so the "Recent student questions" feed can show real
   // student names + which professor's class the question came from.
-  const profileNameById = new Map<string, { full_name: string; student_id: string }>();
+  const profileNameById = new Map<
+    string,
+    { full_name: string | null; student_id: string | null }
+  >();
   for (const p of profiles as Array<{ id: string; full_name?: string; student_id?: string }>) {
     profileNameById.set(p.id, {
-      full_name: p.full_name ?? "(unknown)",
-      student_id: p.student_id ?? "—",
+      full_name: p.full_name ?? null,
+      student_id: p.student_id ?? null,
     });
   }
   // Pull session→prof+course for any session referenced by recent messages.
@@ -167,20 +170,33 @@ export default async function AdminPage() {
       .filter(Boolean)
   );
 
-  // Daily activity over `sinceDays`: count chat_message_sent events per day.
-  const dailyCounts: Record<string, number> = {};
-  for (let i = 0; i < sinceDays; i++) {
+  // Daily activity over `sinceDays`: exact per-day counts straight from the
+  // messages table. (The old approach counted analytics events, but Supabase
+  // silently caps result sets at 1000 rows — once real usage passed that,
+  // recent days fell off the result and the chart rendered empty. Count
+  // queries have no row cap, so these numbers are always exact.)
+  const dayStarts: string[] = [];
+  for (let i = sinceDays - 1; i >= 0; i--) {
     const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-    dailyCounts[d.toISOString().slice(0, 10)] = 0;
+    dayStarts.push(d.toISOString().slice(0, 10));
   }
-  for (const e of events) {
-    if (e.event_type !== "chat_message_sent") continue;
-    const day = e.created_at.slice(0, 10);
-    if (day in dailyCounts) dailyCounts[day]! += 1;
-  }
-  const dailySeries = Object.entries(dailyCounts)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, count]) => ({ date, count }));
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  const dailyCountsRes = await Promise.all(
+    dayStarts.map((day, i) =>
+      supabase
+        .from("messages")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "user")
+        .gte("created_at", day)
+        .lt("created_at", dayStarts[i + 1] ?? tomorrow)
+    )
+  );
+  const dailySeries = dayStarts.map((date, i) => ({
+    date,
+    count: dailyCountsRes[i]?.count ?? 0,
+  }));
   const maxDaily = Math.max(1, ...dailySeries.map((d) => d.count));
 
   // Campus + major breakdown
@@ -375,10 +391,17 @@ export default async function AdminPage() {
                           <div className="break-all font-mono text-xs font-semibold text-foreground">
                             {email ?? "(email unknown)"}
                           </div>
-                          <div className="mt-0.5 text-[10px] uppercase tracking-wider text-ink-400">
-                            {profile?.full_name ?? "name not set"}
-                            {profile?.student_id ? ` · ID ${profile.student_id}` : ""}
-                          </div>
+                          {(profile?.full_name || profile?.student_id) && (
+                            <div className="mt-0.5 text-[10px] uppercase tracking-wider text-ink-400">
+                              {profile?.full_name ?? ""}
+                              {profile?.full_name && profile?.student_id
+                                ? " · "
+                                : ""}
+                              {profile?.student_id
+                                ? `ID ${profile.student_id}`
+                                : ""}
+                            </div>
+                          )}
                         </div>
                         <span className="flex-none text-[11px] uppercase tracking-wider text-ink-400">
                           {when}
@@ -520,7 +543,13 @@ function BreakdownList({
   counts: Map<string, number>;
   total: number;
 }) {
-  const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  // Real answers first; the "hasn't filled out their profile" bucket
+  // always sinks to the bottom so it never dominates the chart.
+  const sorted = Array.from(counts.entries()).sort((a, b) => {
+    if (a[0] === "Unspecified") return 1;
+    if (b[0] === "Unspecified") return -1;
+    return b[1] - a[1];
+  });
   if (sorted.length === 0 || total === 0) {
     return (
       <p className="mt-4 text-sm text-ink-300">No data yet.</p>
@@ -530,11 +559,18 @@ function BreakdownList({
     <ul className="mt-4 flex flex-col gap-2 text-sm">
       {sorted.map(([key, count]) => {
         const pct = Math.round((count / total) * 100);
+        const isUnset = key === "Unspecified";
         return (
           <li key={key} className="flex flex-col gap-1">
             <div className="flex items-start justify-between gap-2 text-xs">
-              <span className="line-clamp-2 break-words font-medium text-foreground">
-                {key}
+              <span
+                className={`line-clamp-2 break-words ${
+                  isUnset
+                    ? "italic text-ink-400"
+                    : "font-medium text-foreground"
+                }`}
+              >
+                {isUnset ? "Not set yet" : key}
               </span>
               <span className="flex-none text-ink-300">
                 {count} · {pct}%

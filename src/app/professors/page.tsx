@@ -702,11 +702,17 @@ async function ProfessorDirectory({
                               />
                             )}
                           </div>
-                          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                            <Mini label="Students" value={p.students.size} />
-                            <Mini label="Sessions" value={p.sessions} />
-                            <Mini label="Courses" value={p.courses.size} />
-                          </div>
+                          {isActive ? (
+                            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                              <Mini label="Students" value={p.students.size} />
+                              <Mini label="Sessions" value={p.sessions} />
+                              <Mini label="Courses" value={p.courses.size} />
+                            </div>
+                          ) : (
+                            <div className="mt-4 text-[11px] italic text-ink-500">
+                              No student activity yet
+                            </div>
+                          )}
                         </Link>
                       </li>
                     );
