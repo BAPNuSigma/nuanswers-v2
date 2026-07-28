@@ -170,33 +170,28 @@ export default async function AdminPage() {
       .filter(Boolean)
   );
 
-  // Daily activity over `sinceDays`: exact per-day counts straight from the
-  // messages table. (The old approach counted analytics events, but Supabase
-  // silently caps result sets at 1000 rows — once real usage passed that,
-  // recent days fell off the result and the chart rendered empty. Count
-  // queries have no row cap, so these numbers are always exact.)
-  const dayStarts: string[] = [];
-  for (let i = sinceDays - 1; i >= 0; i--) {
+  // Daily activity over `sinceDays`: fetch the raw timestamps of student
+  // messages in the window and bucket them by day here. One query with an
+  // explicit limit — no row-cap surprises (the events table silently caps
+  // at 1000 rows, which is what originally zeroed this chart).
+  const { data: windowMessages } = await supabase
+    .from("messages")
+    .select("created_at")
+    .eq("role", "user")
+    .gte("created_at", sinceISO)
+    .limit(1000);
+  const dailyCounts: Record<string, number> = {};
+  for (let i = 0; i < sinceDays; i++) {
     const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-    dayStarts.push(d.toISOString().slice(0, 10));
+    dailyCounts[d.toISOString().slice(0, 10)] = 0;
   }
-  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 10);
-  const dailyCountsRes = await Promise.all(
-    dayStarts.map((day, i) =>
-      supabase
-        .from("messages")
-        .select("id", { count: "exact", head: true })
-        .eq("role", "user")
-        .gte("created_at", day)
-        .lt("created_at", dayStarts[i + 1] ?? tomorrow)
-    )
-  );
-  const dailySeries = dayStarts.map((date, i) => ({
-    date,
-    count: dailyCountsRes[i]?.count ?? 0,
-  }));
+  for (const m of windowMessages ?? []) {
+    const day = String(m.created_at ?? "").slice(0, 10);
+    if (day in dailyCounts) dailyCounts[day] += 1;
+  }
+  const dailySeries = Object.entries(dailyCounts)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, count]) => ({ date, count }));
   const maxDaily = Math.max(1, ...dailySeries.map((d) => d.count));
 
   // Campus + major breakdown
