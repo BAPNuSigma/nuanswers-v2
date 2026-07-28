@@ -469,7 +469,7 @@ function DailyChart({
         return (
           <div
             key={d.date}
-            className="group relative flex flex-1 flex-col items-center justify-end"
+            className="group relative flex h-full flex-1 flex-col items-center justify-end"
             title={`${label}: ${d.count} sessions`}
           >
             <div
